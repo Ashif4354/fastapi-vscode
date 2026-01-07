@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
 import { EndpointTreeProvider } from "./providers/EndpointTreeProvider"
+import { ParserService } from "./services/ParserService"
 // TODO: Replace with real endpoint discovery service
 import {
   groupAppsByWorkspace,
@@ -20,7 +21,17 @@ function navigateToLocation(location: SourceLocation): void {
 }
 
 // This method is called when your extension is activated
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
+  const parserService = new ParserService()
+  await parserService.init(context.extensionUri)
+
+  const tree = parserService.parse(
+    "def hello_world():\n    return 'Hello, world!'",
+  )
+  console.log("Parsed Tree:", tree?.rootNode.toString())
+  vscode.window.showInformationMessage(
+    `Tree-sitter working! AST: ${tree?.rootNode.type}`,
+  )
   const endpointProvider = new EndpointTreeProvider(
     mockApps,
     groupAppsByWorkspace,
