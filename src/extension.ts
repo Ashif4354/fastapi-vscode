@@ -1,9 +1,14 @@
 import * as vscode from "vscode"
 import { EndpointTreeProvider } from "./providers/EndpointTreeProvider"
+// TODO: Replace with real endpoint discovery service
 import { mockApps } from "./test/fixtures/mockEndpointData"
 import type { EndpointTreeItem, SourceLocation } from "./types/endpoint"
 
 function navigateToLocation(location: SourceLocation): void {
+  if (!location.filePath) {
+    vscode.window.showErrorMessage("File path is missing for the endpoint.")
+    return
+  }
   const uri = vscode.Uri.file(location.filePath)
   const position = new vscode.Position(location.line - 1, location.column)
   vscode.window.showTextDocument(uri, {

@@ -1,5 +1,6 @@
 import {
   EventEmitter,
+  MarkdownString,
   ThemeIcon,
   type TreeDataProvider,
   TreeItem,
@@ -8,7 +9,7 @@ import {
 import type {
   AppDefinition,
   EndpointTreeItem,
-  HTTPMethod,
+  RouteMethod,
 } from "../types/endpoint"
 
 export class EndpointTreeProvider
@@ -30,7 +31,7 @@ export class EndpointTreeProvider
     this.refresh()
   }
 
-  private getMethodIcon(method: HTTPMethod): ThemeIcon {
+  private getMethodIcon(method: RouteMethod): ThemeIcon {
     switch (method) {
       case "GET":
         return new ThemeIcon("arrow-right")
@@ -48,8 +49,6 @@ export class EndpointTreeProvider
         return new ThemeIcon("eye")
       case "WEBSOCKET":
         return new ThemeIcon("broadcast")
-      default:
-        return new ThemeIcon("question")
     }
   }
 
@@ -93,6 +92,7 @@ export class EndpointTreeProvider
           TreeItemCollapsibleState.Expanded,
         )
         appItem.iconPath = new ThemeIcon("root-folder")
+        appItem.contextValue = "app"
         return appItem
       }
       case "router": {
@@ -101,7 +101,11 @@ export class EndpointTreeProvider
           TreeItemCollapsibleState.Collapsed,
         )
         routerItem.iconPath = new ThemeIcon("symbol-namespace")
-        routerItem.description = `${element.router.routes.length} routes`
+
+        routerItem.description =
+          element.router.routes.length !== 1
+            ? `${element.router.routes.length} routes`
+            : "1 route"
         routerItem.contextValue = "router"
         return routerItem
       }
@@ -112,7 +116,9 @@ export class EndpointTreeProvider
         routeItem.description = element.route.functionName
         routeItem.iconPath = this.getMethodIcon(element.route.method)
         routeItem.contextValue = "route"
-        routeItem.tooltip = `${element.route.method} ${element.route.path}\n\nFunction: ${element.route.functionName}\nFile: ${element.route.location.filePath}:${element.route.location.line}`
+        routeItem.tooltip = new MarkdownString(
+          `${element.route.method} ${element.route.path}\n\nFunction: ${element.route.functionName}\nFile: ${element.route.location.filePath}:${element.route.location.line}`,
+        )
         routeItem.command = {
           command: "fastapi-vscode.goToEndpoint",
           title: "Go to Definition",
@@ -125,5 +131,9 @@ export class EndpointTreeProvider
 
   refresh(): void {
     this._onDidChangeTreeData.fire(undefined)
+  }
+
+  dispose(): void {
+    this._onDidChangeTreeData.dispose()
   }
 }

@@ -159,12 +159,33 @@ suite("EndpointTreeProvider", () => {
     assert.ok(route, "Should find a route")
     if (route?.type === "route") {
       const treeItem = provider.getTreeItem(route)
-      const tooltip = treeItem.tooltip as string
-      assert.ok(tooltip.includes("File:"), "Tooltip should include file info")
+      assert.ok(treeItem.tooltip, "Route should have a tooltip")
+      // MarkdownString has a .value property with the raw content
+      const tooltipValue =
+        typeof treeItem.tooltip === "string"
+          ? treeItem.tooltip
+          : (treeItem.tooltip as { value: string }).value
       assert.ok(
-        tooltip.includes(route.route.location.filePath),
+        tooltipValue.includes("File:"),
+        "Tooltip should include file info",
+      )
+      assert.ok(
+        tooltipValue.includes(route.route.location.filePath),
         "Tooltip should include file path",
       )
     }
+  })
+
+  test("getChildren returns empty array when no apps", () => {
+    const emptyProvider = new EndpointTreeProvider([])
+    const roots = emptyProvider.getChildren()
+    assert.strictEqual(roots.length, 0, "Should return empty array")
+  })
+
+  test("getTreeItem sets contextValue for app", () => {
+    const roots = provider.getChildren()
+    const app = roots[0]
+    const treeItem = provider.getTreeItem(app)
+    assert.strictEqual(treeItem.contextValue, "app")
   })
 })

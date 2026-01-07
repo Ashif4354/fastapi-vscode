@@ -6,7 +6,8 @@ export type HTTPMethod =
   | "PATCH"
   | "OPTIONS"
   | "HEAD"
-  | "WEBSOCKET"
+
+export type RouteMethod = HTTPMethod | "WEBSOCKET"
 
 export interface SourceLocation {
   filePath: string
@@ -15,7 +16,7 @@ export interface SourceLocation {
 }
 
 export interface RouteDefinition {
-  method: HTTPMethod
+  method: RouteMethod
   path: string
   functionName: string
   location: SourceLocation
