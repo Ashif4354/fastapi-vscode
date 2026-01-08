@@ -25,6 +25,7 @@ export interface RouteDefinition {
 export interface RouterDefinition {
   name: string
   prefix: string
+  tags: string[]
   location: SourceLocation
   routes: RouteDefinition[]
 }

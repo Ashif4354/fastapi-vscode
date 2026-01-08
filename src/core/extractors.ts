@@ -71,6 +71,7 @@ export function routerExtractor(node: Node): {
   variableName: string
   type: RouterType
   prefix: string
+  tags: string[]
   line: number
   column: number
 } | null {
@@ -98,17 +99,23 @@ export function routerExtractor(node: Node): {
     }
 
     let prefix = ""
+    const tags: string[] = []
     const argumentsNode = valueNode.childForFieldName("arguments")
     if (argumentsNode) {
-      const prefixArgNode = argumentsNode.namedChildren.find(
-        (child) =>
-          child.type === "keyword_argument" &&
-          child.childForFieldName("name")?.text === "prefix",
-      )
-      if (prefixArgNode) {
-        const prefixValue = prefixArgNode.childForFieldName("value")
-        if (prefixValue?.type === "string") {
-          prefix = prefixValue.text.slice(1, -1) // Remove quotes
+      for (const child of argumentsNode.namedChildren) {
+        if (child.type !== "keyword_argument") continue
+        const argName = child.childForFieldName("name")?.text
+        const argValue = child.childForFieldName("value")
+
+        if (argName === "prefix" && argValue?.type === "string") {
+          prefix = argValue.text.slice(1, -1) // Remove quotes
+        } else if (argName === "tags" && argValue?.type === "list") {
+          // Extract tags from list like ["login", "auth"]
+          for (const elem of argValue.namedChildren) {
+            if (elem.type === "string") {
+              tags.push(elem.text.slice(1, -1)) // Remove quotes
+            }
+          }
         }
       }
     }
@@ -117,6 +124,7 @@ export function routerExtractor(node: Node): {
         variableName,
         type,
         prefix,
+        tags,
         line: node.startPosition.row + 1,
         column: node.startPosition.column,
       }

@@ -10,6 +10,7 @@ export interface RouterNode {
   variableName: string
   type: RouterType
   prefix: string
+  tags: string[]
   line: number
   column: number
   routes: {
@@ -56,6 +57,7 @@ export function buildRouterGraph(
     variableName: appRouter.variableName,
     type: appRouter.type,
     prefix: appRouter.prefix,
+    tags: appRouter.tags,
     line: appRouter.line,
     column: appRouter.column,
     routes: analysis.routes.map((r) => ({

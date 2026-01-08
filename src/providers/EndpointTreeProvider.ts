@@ -115,11 +115,31 @@ export class EndpointTreeProvider
       }
 
       case "router": {
+        // Use prefix as label, or first tag, or filename as fallback
+        let routerLabel = element.router.prefix
+        let labelSource: "prefix" | "tag" | "file" = "prefix"
+        if (!routerLabel) {
+          if (element.router.tags.length > 0) {
+            routerLabel = element.router.tags[0]
+            labelSource = "tag"
+          } else {
+            const filePath = element.router.location.filePath
+            const fileName = filePath.split("/").pop() ?? ""
+            routerLabel = fileName.replace(/\.py$/, "")
+            labelSource = "file"
+          }
+        }
         const routerItem = new TreeItem(
-          element.router.prefix,
+          routerLabel,
           TreeItemCollapsibleState.Collapsed,
         )
-        routerItem.iconPath = new ThemeIcon("symbol-namespace")
+        // Different icons: braces for prefix, tag for tag, file for filename
+        const iconMap = {
+          prefix: "symbol-namespace",
+          tag: "tag",
+          file: "symbol-file",
+        }
+        routerItem.iconPath = new ThemeIcon(iconMap[labelSource])
 
         routerItem.description =
           element.router.routes.length !== 1

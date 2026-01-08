@@ -50,6 +50,7 @@ function flattenRouterNode(
     routers.push({
       name: node.variableName,
       prefix: fullPrefix,
+      tags: node.tags,
       location: {
         filePath: node.filePath,
         line: node.line,
