@@ -7,6 +7,7 @@ import {
   includeRouterExtractor,
   routerExtractor,
 } from "./core/extractors"
+import { resolveImport, resolveNamedImport } from "./core/importResolver"
 import { Parser } from "./core/parser"
 import { EndpointTreeProvider } from "./providers/EndpointTreeProvider"
 // TODO: Replace with real endpoint discovery service
@@ -55,6 +56,19 @@ export async function activate(context: vscode.ExtensionContext) {
     "/Users/savannah/work/full-stack-fastapi-template/backend/app/api/routes/users.py"
   const realAnalysis = analyzeFile(realFile, parserService)
   console.log("Real file analysis:", realAnalysis)
+
+  const testImport = {
+    modulePath: "routes",
+    isRelative: true,
+    relativeDots: 1,
+    names: ["users"],
+  }
+  const resolved = resolveNamedImport(
+    testImport,
+    "/Users/savannah/work/full-stack-fastapi-template/backend/app/api/main.py",
+    "/Users/savannah/work/full-stack-fastapi-template/backend",
+  )
+  console.log("Resolved named import:", resolved)
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider(
