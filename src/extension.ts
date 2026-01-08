@@ -1,6 +1,11 @@
 import * as vscode from "vscode"
+import {
+  findNodesByType,
+  processDecoratedDefinition,
+  walkTree,
+} from "./core/astUtils"
+import { Parser } from "./core/parser"
 import { EndpointTreeProvider } from "./providers/EndpointTreeProvider"
-import { ParserService } from "./services/ParserService"
 // TODO: Replace with real endpoint discovery service
 import {
   groupAppsByWorkspace,
@@ -22,20 +27,49 @@ function navigateToLocation(location: SourceLocation): void {
 
 // This method is called when your extension is activated
 export async function activate(context: vscode.ExtensionContext) {
-  const parserService = new ParserService()
-  await parserService.init(context.extensionUri)
+  const parserService = new Parser()
+  await parserService.init({
+    core: vscode.Uri.joinPath(
+      context.extensionUri,
+      "dist",
+      "wasm",
+      "web-tree-sitter.wasm",
+    ).fsPath,
+    python: vscode.Uri.joinPath(
+      context.extensionUri,
+      "dist",
+      "wasm",
+      "tree-sitter-python.wasm",
+    ).fsPath,
+  })
 
-  const tree = parserService.parse(
-    "def hello_world():\n    return 'Hello, world!'",
-  )
-  console.log("Parsed Tree:", tree?.rootNode.toString())
-  vscode.window.showInformationMessage(
-    `Tree-sitter working! AST: ${tree?.rootNode.type}`,
-  )
   const endpointProvider = new EndpointTreeProvider(
     mockApps,
     groupAppsByWorkspace,
   )
+
+  const fastapiCode = `
+  from fastapi import FastAPI
+  app = FastAPI()
+  
+  @app.get("/items/{item_id}")
+  async def read_item(item_id: int):
+      return {"item_id": item_id} 
+    
+  `
+  const t = parserService.parse(fastapiCode)
+  console.log("Parsed FastAPI Code Tree:", t?.rootNode.toString())
+
+  const tree = parserService.parse(fastapiCode)
+  const decoratedDefs = tree
+    ? findNodesByType(tree.rootNode, "decorated_definition")
+    : []
+  console.log("Decorated Definitions Found:", decoratedDefs.length)
+
+  for (const def of decoratedDefs) {
+    const result = processDecoratedDefinition(def)
+    console.log("Processed Decorated Definition:", result)
+  }
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider(
