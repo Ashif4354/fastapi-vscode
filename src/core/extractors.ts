@@ -3,9 +3,20 @@
 import type { Node } from "web-tree-sitter"
 import { findNodesByType } from "./astUtils"
 
-export function decoratorExtractor(
-  node: Node,
-): { object: string; method: string; path: string; function: string } | null {
+export interface SourceLocation {
+  filePath: string
+  line: number
+  column: number
+}
+
+export function decoratorExtractor(node: Node): {
+  object: string
+  method: string
+  path: string
+  function: string
+  line: number
+  column: number
+} | null {
   if (node.type !== "decorated_definition") {
     return null
   }
@@ -49,14 +60,20 @@ export function decoratorExtractor(
     method: methodNode.text,
     path,
     function: functionName,
+    line: node.startPosition.row + 1,
+    column: node.startPosition.column,
   }
 }
 
 export type RouterType = "APIRouter" | "FastAPI" | "Unknown"
 
-export function routerExtractor(
-  node: Node,
-): { variableName: string; type: RouterType; prefix: string } | null {
+export function routerExtractor(node: Node): {
+  variableName: string
+  type: RouterType
+  prefix: string
+  line: number
+  column: number
+} | null {
   if (node.type !== "assignment") {
     return null
   }
@@ -96,7 +113,13 @@ export function routerExtractor(
       }
     }
     if (type !== "Unknown") {
-      return { variableName, type, prefix }
+      return {
+        variableName,
+        type,
+        prefix,
+        line: node.startPosition.row + 1,
+        column: node.startPosition.column,
+      }
     }
   }
 
@@ -122,14 +145,10 @@ export function importExtractor(node: Node): {
   let relativeDots = 0
 
   if (node.type === "import_statement") {
-    const moduleNode = node.childForFieldName("module_name")
-    console.log("Import module node:", moduleNode)
-    if (moduleNode) {
-      modulePath = moduleNode.text
-    }
-
+    // import_statement has "name" field, not "module_name"
     const nameNodes = findNodesByType(node, "dotted_name")
     for (const nameNode of nameNodes) {
+      modulePath = nameNode.text
       const asNames = nameNode.text.split(".")
       names.push(asNames[0])
     }

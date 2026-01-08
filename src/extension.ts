@@ -1,21 +1,58 @@
 import * as vscode from "vscode"
-import { analyzeFile, analyzeTree } from "./core/analyzer"
-import { findNodesByType } from "./core/astUtils"
-import {
-  decoratorExtractor,
-  importExtractor,
-  includeRouterExtractor,
-  routerExtractor,
-} from "./core/extractors"
-import { resolveImport, resolveNamedImport } from "./core/importResolver"
 import { Parser } from "./core/parser"
+import { buildRouterGraph } from "./core/routerResolver"
+import { routerNodeToAppDefinition } from "./core/transformer"
 import { EndpointTreeProvider } from "./providers/EndpointTreeProvider"
-// TODO: Replace with real endpoint discovery service
-import {
-  groupAppsByWorkspace,
-  mockApps,
-} from "./test/fixtures/mockEndpointData"
-import type { EndpointTreeItem, SourceLocation } from "./types/endpoint"
+import type {
+  AppDefinition,
+  EndpointTreeItem,
+  SourceLocation,
+} from "./types/endpoint"
+
+async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
+  const apps: AppDefinition[] = []
+  const workspaceFolders = vscode.workspace.workspaceFolders
+
+  if (!workspaceFolders) {
+    return apps
+  }
+
+  for (const folder of workspaceFolders) {
+    // Look for common FastAPI entry points
+    const entryPatterns = [
+      "main.py",
+      "app/main.py",
+      "src/main.py",
+      "backend/app/main.py",
+    ]
+
+    for (const pattern of entryPatterns) {
+      const entryUri = vscode.Uri.joinPath(folder.uri, pattern)
+      try {
+        await vscode.workspace.fs.stat(entryUri)
+        // File exists, try to build router graph
+        // The project root for Python imports is the directory containing the entry file's parent package
+        // e.g., for backend/app/main.py, the project root is backend/
+        const entryDir = entryUri.fsPath.split("/").slice(0, -1).join("/")
+        const pythonProjectRoot = entryDir.split("/").slice(0, -1).join("/")
+        const routerNode = buildRouterGraph(
+          entryUri.fsPath,
+          parser,
+          pythonProjectRoot,
+        )
+        if (routerNode) {
+          const app = routerNodeToAppDefinition(routerNode, folder.uri.fsPath)
+          apps.push(app)
+          break // Found an entry point for this workspace
+        }
+      } catch {
+        // File doesn't exist, try next pattern
+      }
+    }
+  }
+
+  return apps
+}
 
 function navigateToLocation(location: SourceLocation): void {
   if (!location.filePath) {
@@ -29,7 +66,6 @@ function navigateToLocation(location: SourceLocation): void {
   })
 }
 
-// This method is called when your extension is activated
 export async function activate(context: vscode.ExtensionContext) {
   const parserService = new Parser()
   await parserService.init({
@@ -47,28 +83,9 @@ export async function activate(context: vscode.ExtensionContext) {
     ).fsPath,
   })
 
-  const endpointProvider = new EndpointTreeProvider(
-    mockApps,
-    groupAppsByWorkspace,
-  )
-
-  const realFile =
-    "/Users/savannah/work/full-stack-fastapi-template/backend/app/api/routes/users.py"
-  const realAnalysis = analyzeFile(realFile, parserService)
-  console.log("Real file analysis:", realAnalysis)
-
-  const testImport = {
-    modulePath: "routes",
-    isRelative: true,
-    relativeDots: 1,
-    names: ["users"],
-  }
-  const resolved = resolveNamedImport(
-    testImport,
-    "/Users/savannah/work/full-stack-fastapi-template/backend/app/api/main.py",
-    "/Users/savannah/work/full-stack-fastapi-template/backend",
-  )
-  console.log("Resolved named import:", resolved)
+  // Discover FastAPI endpoints from workspace
+  const apps = await discoverFastAPIApps(parserService)
+  const endpointProvider = new EndpointTreeProvider(apps)
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider(
@@ -76,9 +93,13 @@ export async function activate(context: vscode.ExtensionContext) {
       endpointProvider,
     ),
 
-    vscode.commands.registerCommand("fastapi-vscode.refreshEndpoints", () => {
-      endpointProvider.refresh()
-    }),
+    vscode.commands.registerCommand(
+      "fastapi-vscode.refreshEndpoints",
+      async () => {
+        const newApps = await discoverFastAPIApps(parserService)
+        endpointProvider.setApps(newApps)
+      },
+    ),
 
     vscode.commands.registerCommand(
       "fastapi-vscode.goToEndpoint",

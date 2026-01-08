@@ -1,4 +1,4 @@
-import fs from "fs"
+import fs from "node:fs"
 import type { Tree } from "web-tree-sitter"
 import { findNodesByType } from "./astUtils"
 import {

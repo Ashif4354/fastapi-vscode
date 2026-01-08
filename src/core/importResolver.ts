@@ -1,4 +1,4 @@
-import * as fs from "fs"
+import * as fs from "node:fs"
 
 export function resolveImport(
   importInfo: { modulePath: string; isRelative: boolean; relativeDots: number },
@@ -12,19 +12,19 @@ export function resolveImport(
       .split("/")
       .slice(0, -1 * importInfo.relativeDots)
       .join("/")
-    resolvedPath = currentDir + "/" + importInfo.modulePath.replace(/\./g, "/")
+    resolvedPath = `${currentDir}/${importInfo.modulePath.replace(/\./g, "/")}`
   } else {
-    resolvedPath = projectRoot + "/" + importInfo.modulePath.replace(/\./g, "/")
+    resolvedPath = `${projectRoot}/${importInfo.modulePath.replace(/\./g, "/")}`
   }
 
   // check for .py file
-  if (fs.existsSync(resolvedPath + ".py")) {
-    return resolvedPath + ".py"
+  if (fs.existsSync(`${resolvedPath}.py`)) {
+    return `${resolvedPath}.py`
   }
 
   // check for __init__.py in directory
-  if (fs.existsSync(resolvedPath + "/__init__.py")) {
-    return resolvedPath + "/__init__.py"
+  if (fs.existsSync(`${resolvedPath}/__init__.py`)) {
+    return `${resolvedPath}/__init__.py`
   }
 
   return null
@@ -52,13 +52,13 @@ export function resolveNamedImport(
       name.replace(/\./g, "/")
 
     // check for .py file
-    if (fs.existsSync(namedPath + ".py")) {
-      return namedPath + ".py"
+    if (fs.existsSync(`${namedPath}.py`)) {
+      return `${namedPath}.py`
     }
 
     // check for __init__.py in directory
-    if (fs.existsSync(namedPath + "/__init__.py")) {
-      return namedPath + "/__init__.py"
+    if (fs.existsSync(`${namedPath}/__init__.py`)) {
+      return `${namedPath}/__init__.py`
     }
   }
 
