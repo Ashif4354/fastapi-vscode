@@ -1,0 +1,179 @@
+import * as assert from "node:assert"
+import * as path from "node:path"
+import { Parser } from "../core/parser"
+import { buildRouterGraph } from "../core/routerResolver"
+import { routerNodeToAppDefinition } from "../core/transformer"
+
+// Tests run from dist/test/*.test.js, so we go up to dist, then into wasm
+const getWasmPaths = () => {
+  const wasmDir = path.join(__dirname, "..", "wasm")
+  return {
+    core: path.join(wasmDir, "web-tree-sitter.wasm"),
+    python: path.join(wasmDir, "tree-sitter-python.wasm"),
+  }
+}
+
+// Fixtures are in src/test/fixtures/python
+const getFixturesPath = () => {
+  return path.join(__dirname, "..", "..", "src", "test", "fixtures", "python")
+}
+
+suite("transformer", () => {
+  let parser: Parser
+  let fixturesPath: string
+
+  suiteSetup(async () => {
+    parser = new Parser()
+    await parser.init(getWasmPaths())
+    fixturesPath = getFixturesPath()
+  })
+
+  suiteTeardown(() => {
+    parser.dispose()
+  })
+
+  suite("routerNodeToAppDefinition", () => {
+    test("transforms router graph to AppDefinition", () => {
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const routerNode = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      const result = routerNodeToAppDefinition(routerNode, "/workspace")
+
+      assert.ok(result)
+      assert.strictEqual(result.name, "app")
+      assert.strictEqual(result.filePath, mainPyPath)
+      assert.strictEqual(result.workspaceFolder, "/workspace")
+    })
+
+    test("includes direct routes on app", () => {
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const routerNode = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      const result = routerNodeToAppDefinition(routerNode, "/workspace")
+
+      // main.py has @app.get("/health")
+      const healthRoute = result.routes.find((r) => r.path === "/health")
+      assert.ok(healthRoute)
+      assert.strictEqual(healthRoute.method, "GET")
+      assert.strictEqual(healthRoute.functionName, "health_check")
+    })
+
+    test("flattens nested routers", () => {
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const routerNode = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      const result = routerNodeToAppDefinition(routerNode, "/workspace")
+
+      // Should have routers from the include chain
+      assert.ok(result.routers.length > 0)
+    })
+
+    test("computes full path with prefixes", () => {
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const routerNode = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      const result = routerNodeToAppDefinition(routerNode, "/workspace")
+
+      // The users router should have prefix computed from:
+      // app -> /api/v1 -> /users = /api/v1/users
+      const usersRouter = result.routers.find((r) =>
+        r.prefix.includes("/users"),
+      )
+      if (usersRouter) {
+        assert.ok(
+          usersRouter.prefix.startsWith("/api/v1"),
+          `Expected prefix to start with /api/v1, got ${usersRouter.prefix}`,
+        )
+      }
+    })
+
+    test("normalizes HTTP methods to uppercase", () => {
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const routerNode = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      const result = routerNodeToAppDefinition(routerNode, "/workspace")
+
+      for (const route of result.routes) {
+        assert.strictEqual(
+          route.method,
+          route.method.toUpperCase(),
+          "Method should be uppercase",
+        )
+      }
+
+      for (const router of result.routers) {
+        for (const route of router.routes) {
+          assert.strictEqual(
+            route.method,
+            route.method.toUpperCase(),
+            "Method should be uppercase",
+          )
+        }
+      }
+    })
+
+    test("includes location info for routes", () => {
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const routerNode = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      const result = routerNodeToAppDefinition(routerNode, "/workspace")
+
+      for (const route of result.routes) {
+        assert.ok(route.location.filePath)
+        assert.ok(route.location.line > 0)
+        assert.ok(route.location.column >= 0)
+      }
+    })
+
+    test("includes location info for routers", () => {
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const routerNode = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      const result = routerNodeToAppDefinition(routerNode, "/workspace")
+
+      for (const router of result.routers) {
+        assert.ok(router.location.filePath)
+        assert.ok(router.location.line > 0)
+        assert.ok(router.location.column >= 0)
+      }
+    })
+
+    test("includes tags from routers", () => {
+      const usersPath = path.join(
+        fixturesPath,
+        "app",
+        "api",
+        "routes",
+        "items.py",
+      )
+      const routerNode = buildRouterGraph(usersPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      // items.py has: router = APIRouter(tags=["items"])
+      assert.ok(routerNode.tags.includes("items"))
+    })
+
+    test("skips routers with no routes", () => {
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const routerNode = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      assert.ok(routerNode)
+
+      const result = routerNodeToAppDefinition(routerNode, "/workspace")
+
+      // All routers in result should have at least one route
+      for (const router of result.routers) {
+        assert.ok(
+          router.routes.length > 0,
+          `Router ${router.name} should have routes`,
+        )
+      }
+    })
+  })
+})

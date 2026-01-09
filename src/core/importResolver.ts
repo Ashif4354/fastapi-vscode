@@ -10,11 +10,17 @@ export function resolveImport(
   let resolvedPath = ""
 
   if (importInfo.isRelative) {
+    // For relative imports, slice off 'relativeDots' path segments:
+    // - 1 dot: remove filename → current directory
+    // - 2 dots: remove filename + 1 dir → parent directory
     const currentDir = currentFilePath
       .split("/")
       .slice(0, -1 * importInfo.relativeDots)
       .join("/")
-    resolvedPath = `${currentDir}/${importInfo.modulePath.replace(/\./g, "/")}`
+    const moduleSuffix = importInfo.modulePath
+      ? `/${importInfo.modulePath.replace(/\./g, "/")}`
+      : ""
+    resolvedPath = `${currentDir}${moduleSuffix}`
   } else {
     resolvedPath = `${projectRoot}/${importInfo.modulePath.replace(/\./g, "/")}`
   }
