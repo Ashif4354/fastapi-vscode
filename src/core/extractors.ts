@@ -178,9 +178,15 @@ export function routerExtractor(node: Node): {
   return null
 }
 
+export interface ImportedName {
+  name: string // The original name being imported
+  alias: string | null // The alias if using "as", null otherwise
+}
+
 export function importExtractor(node: Node): {
   modulePath: string
   names: string[]
+  namedImports: ImportedName[] // More detailed info including aliases
   isRelative: boolean
   relativeDots: number
 } | null {
@@ -193,6 +199,7 @@ export function importExtractor(node: Node): {
 
   let modulePath = ""
   const names: string[] = []
+  const namedImports: ImportedName[] = []
   let isRelative = false
   let relativeDots = 0
 
@@ -203,6 +210,7 @@ export function importExtractor(node: Node): {
       modulePath = nameNode.text
       const asNames = nameNode.text.split(".")
       names.push(asNames[0])
+      namedImports.push({ name: asNames[0], alias: null })
     }
   } else if (node.type === "import_from_statement") {
     const moduleNode = node.childForFieldName("module_name")
@@ -217,14 +225,45 @@ export function importExtractor(node: Node): {
         modulePath = rawPath
       }
     }
+
+    // Look for aliased_import nodes (e.g., "router as users_router")
+    const aliasedImports = findNodesByType(node, "aliased_import")
+    for (const aliased of aliasedImports) {
+      const nameNode = aliased.childForFieldName("name")
+      const aliasNode = aliased.childForFieldName("alias")
+      if (nameNode) {
+        const originalName = nameNode.text
+        const aliasName = aliasNode?.text ?? null
+        names.push(aliasName ?? originalName)
+        namedImports.push({ name: originalName, alias: aliasName })
+      }
+    }
   }
 
-  const nameNodes = findNodesByType(node, "dotted_name")
-  for (let i = 1; i < nameNodes.length; i++) {
-    names.push(nameNodes[i].text)
+  // Also get non-aliased imports (dotted_name nodes that aren't part of aliased_import)
+  if (node.type === "import_from_statement") {
+    const nameNodes = findNodesByType(node, "dotted_name")
+    // Skip the first one (module path) and any that are children of aliased_import
+    for (let i = 1; i < nameNodes.length; i++) {
+      const nameNode = nameNodes[i]
+      // Check if this node is inside an aliased_import
+      let parent = nameNode.parent
+      let isAliased = false
+      while (parent) {
+        if (parent.type === "aliased_import") {
+          isAliased = true
+          break
+        }
+        parent = parent.parent
+      }
+      if (!isAliased) {
+        names.push(nameNode.text)
+        namedImports.push({ name: nameNode.text, alias: null })
+      }
+    }
   }
 
-  return { modulePath, names, isRelative, relativeDots }
+  return { modulePath, names, namedImports, isRelative, relativeDots }
 }
 
 export function includeRouterExtractor(

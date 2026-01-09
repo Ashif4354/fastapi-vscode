@@ -89,6 +89,7 @@ export function buildRouterGraph(
         },
         resolvedEntryFile,
         projectRoot,
+        parser, // Pass parser to enable __init__.py re-export resolution
       )
 
       if (!importedFilePath) {

@@ -9,7 +9,9 @@ import {
 import type {
   AppDefinition,
   EndpointTreeItem,
+  RouteDefinition,
   RouteMethod,
+  RouterDefinition,
 } from "../types/endpoint"
 
 type GroupingFunction = (apps: AppDefinition[]) => EndpointTreeItem[]
@@ -77,6 +79,31 @@ export class EndpointTreeProvider
     }
   }
 
+  /**
+   * Gets the display label for a router (used for sorting).
+   * Uses prefix (stripped), then tag, then filename as fallback.
+   */
+  private getRouterSortKey(router: RouterDefinition): string {
+    const strippedPrefix = stripLeadingDynamicSegments(router.prefix)
+    if (strippedPrefix !== "/") {
+      return strippedPrefix.toLowerCase()
+    }
+    if (router.tags.length > 0) {
+      return router.tags[0].toLowerCase()
+    }
+    const fileName = router.location.filePath.split("/").pop() ?? ""
+    return fileName.replace(/\.py$/, "").toLowerCase()
+  }
+
+  /**
+   * Gets the display path for a route (used for sorting).
+   */
+  private getRouteSortKey(route: RouteDefinition): string {
+    const path =
+      stripLeadingDynamicSegments(route.path).replace(/^\//, "") || "/"
+    return `${route.method} ${path}`.toLowerCase()
+  }
+
   getChildren(element?: EndpointTreeItem): EndpointTreeItem[] {
     if (!element) {
       // Root level: use grouping function (may return workspaces or apps)
@@ -85,23 +112,43 @@ export class EndpointTreeProvider
 
     switch (element.type) {
       case "workspace":
-        return element.apps.map((app) => ({ type: "app" as const, app }))
+        return element.apps
+          .map((app) => ({ type: "app" as const, app }))
+          .sort((a, b) => a.app.name.localeCompare(b.app.name))
       case "app": {
-        const routers = element.app.routers.map((router) => ({
-          type: "router" as const,
-          router,
-        }))
-        const routes = element.app.routes.map((route) => ({
-          type: "route" as const,
-          route,
-        }))
+        const routers = element.app.routers
+          .map((router) => ({
+            type: "router" as const,
+            router,
+          }))
+          .sort((a, b) =>
+            this.getRouterSortKey(a.router).localeCompare(
+              this.getRouterSortKey(b.router),
+            ),
+          )
+        const routes = element.app.routes
+          .map((route) => ({
+            type: "route" as const,
+            route,
+          }))
+          .sort((a, b) =>
+            this.getRouteSortKey(a.route).localeCompare(
+              this.getRouteSortKey(b.route),
+            ),
+          )
         return [...routers, ...routes]
       }
       case "router":
-        return element.router.routes.map((route) => ({
-          type: "route" as const,
-          route,
-        }))
+        return element.router.routes
+          .map((route) => ({
+            type: "route" as const,
+            route,
+          }))
+          .sort((a, b) =>
+            this.getRouteSortKey(a.route).localeCompare(
+              this.getRouteSortKey(b.route),
+            ),
+          )
       case "route":
         return []
     }
@@ -120,12 +167,32 @@ export class EndpointTreeProvider
       }
 
       case "app": {
+        // Use a more descriptive name when the variable name is generic (like "app")
+        // Include the parent directory to disambiguate multiple apps
+        let appLabel = element.app.name
+        if (appLabel === "app" || this.apps.length > 1) {
+          // Extract meaningful context from the file path
+          // e.g., "backend/app/main.py" -> "backend/app"
+          const pathParts = element.app.filePath.split("/")
+          const fileName = pathParts.pop() ?? ""
+          const parentDir = pathParts.pop() ?? ""
+          const grandParentDir = pathParts.pop() ?? ""
+
+          if (parentDir && parentDir !== "src" && parentDir !== "app") {
+            appLabel = parentDir
+          } else if (grandParentDir) {
+            appLabel = `${grandParentDir}/${parentDir}`
+          } else {
+            appLabel = fileName.replace(/\.py$/, "")
+          }
+        }
         const appItem = new TreeItem(
-          element.app.name,
+          appLabel,
           TreeItemCollapsibleState.Expanded,
         )
         appItem.iconPath = new ThemeIcon("root-folder")
         appItem.contextValue = "app"
+        appItem.description = element.app.name // Show the actual variable name as description
         return appItem
       }
 

@@ -18,13 +18,24 @@ async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
   }
 
   for (const folder of workspaceFolders) {
-    // Look for common FastAPI entry points
-    const entryPatterns = [
-      "main.py",
-      "app/main.py",
-      "src/main.py",
-      "backend/app/main.py",
-    ]
+    // Check if user has configured a custom entry point
+    const config = vscode.workspace.getConfiguration("fastapi", folder.uri)
+    const customEntryPoint = config.get<string>("entryPoint")
+
+    let entryPatterns: string[]
+    if (customEntryPoint) {
+      // Use only the custom entry point if configured
+      entryPatterns = [customEntryPoint]
+    } else {
+      // Look for common FastAPI entry points
+      entryPatterns = [
+        "main.py",
+        "app/main.py",
+        "api/main.py",
+        "src/main.py",
+        "backend/app/main.py",
+      ]
+    }
 
     for (const pattern of entryPatterns) {
       const entryUri = vscode.Uri.joinPath(folder.uri, pattern)
