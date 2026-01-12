@@ -16,10 +16,8 @@
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "lint-staged": "^16.2.7",
+    "typescript": "^5.0.0"
   },
   "activationEvents": [
     "workspaceContains:**/*.py"
@@ -43,6 +41,16 @@
         "title": "Toggle Expand/Collapse Routers",
         "category": "FastAPI",
         "icon": "$(fold)"
+      },
+      {
+        "command": "fastapi-vscode.copyEndpointPath",
+        "title": "Copy Endpoint Path",
+        "category": "FastAPI"
+      },
+      {
+        "command": "fastapi-vscode.copyRouterPrefix",
+        "title": "Copy Router Prefix",
+        "category": "FastAPI"
       }
     ],
     "menus": {
@@ -111,7 +119,7 @@
       "biome check --write"
     ]
   },
-  "publisher": "FastAPI Labs",
+  "publisher": "FastAPILabs",
   "scripts": {
     "vscode:prepublish": "bun run esbuild.js --production",
     "compile": "bun run esbuild.js",
