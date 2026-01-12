@@ -1,7 +1,13 @@
-// Public API for FastAPI endpoint discovery
-// This module can be used independently of VSCode
+/**
+ * Public API for FastAPI endpoint discovery.
+ * This module can be used independently of VSCode.
+ */
 
-// Re-export core types
+export { analyzeFile, analyzeTree } from "./analyzer"
+export type { FileAnalysis } from "./internal"
+export { Parser } from "./parser"
+export { buildRouterGraph, type RouterNode } from "./routerResolver"
+export { routerNodeToAppDefinition } from "./transformer"
 export type {
   AppDefinition,
   HTTPMethod,
@@ -9,8 +15,4 @@ export type {
   RouteMethod,
   RouterDefinition,
   SourceLocation,
-} from "../types/endpoint"
-export { analyzeFile, analyzeTree, type FileAnalysis } from "./analyzer"
-export { Parser } from "./parser"
-export { buildRouterGraph, type RouterNode } from "./routerResolver"
-export { routerNodeToAppDefinition } from "./transformer"
+} from "./types"

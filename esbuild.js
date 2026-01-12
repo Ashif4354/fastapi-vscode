@@ -47,6 +47,8 @@ async function main() {
       "src/test/importResolver.test.ts",
       "src/test/routerResolver.test.ts",
       "src/test/transformer.test.ts",
+      "src/test/pathUtils.test.ts",
+      "src/test/parser.test.ts",
     ],
     bundle: true,
     format: "cjs",

@@ -12,7 +12,7 @@ import type {
   RouteDefinition,
   RouteMethod,
   RouterDefinition,
-} from "../types/endpoint"
+} from "../core/types"
 
 export type EndpointTreeItem =
   | { type: "workspace"; label: string; apps: AppDefinition[] }
@@ -23,9 +23,24 @@ export type EndpointTreeItem =
 
 type GroupingFunction = (apps: AppDefinition[]) => EndpointTreeItem[]
 
-// Default grouping: apps directly at root level
+/** Default grouping: apps directly at root level */
 const defaultGrouping: GroupingFunction = (apps) =>
   apps.map((app) => ({ type: "app" as const, app }))
+
+/** Method icons for route display */
+const METHOD_ICONS: Record<RouteMethod, string> = {
+  GET: "arrow-right",
+  POST: "plus",
+  PUT: "edit",
+  DELETE: "trash",
+  PATCH: "pencil",
+  OPTIONS: "settings-gear",
+  HEAD: "eye",
+  WEBSOCKET: "broadcast",
+}
+
+/** Parent directories that don't provide useful context for labels */
+const GENERIC_PARENT_DIRS = new Set(["routes", "api", "routers", "endpoints"])
 
 export class EndpointTreeProvider
   implements TreeDataProvider<EndpointTreeItem>
@@ -53,24 +68,7 @@ export class EndpointTreeProvider
   }
 
   private getMethodIcon(method: RouteMethod): ThemeIcon {
-    switch (method) {
-      case "GET":
-        return new ThemeIcon("arrow-right")
-      case "POST":
-        return new ThemeIcon("plus")
-      case "PUT":
-        return new ThemeIcon("edit")
-      case "DELETE":
-        return new ThemeIcon("trash")
-      case "PATCH":
-        return new ThemeIcon("pencil")
-      case "OPTIONS":
-        return new ThemeIcon("settings-gear")
-      case "HEAD":
-        return new ThemeIcon("eye")
-      case "WEBSOCKET":
-        return new ThemeIcon("broadcast")
-    }
+    return new ThemeIcon(METHOD_ICONS[method])
   }
 
   /**
@@ -110,16 +108,17 @@ export class EndpointTreeProvider
   }
 
   /**
-   * Finds the parent router if this router is nested.
+   * Generic search through router tree.
+   * Returns the router that matches the predicate.
    */
-  private findParentRouter(
-    target: RouterDefinition,
+  private searchRouters(
+    predicate: (router: RouterDefinition) => boolean,
   ): RouterDefinition | undefined {
     const searchIn = (
       routers: RouterDefinition[],
     ): RouterDefinition | undefined => {
       for (const router of routers) {
-        if (router.children.includes(target)) {
+        if (predicate(router)) {
           return router
         }
         const found = searchIn(router.children)
@@ -136,29 +135,68 @@ export class EndpointTreeProvider
   }
 
   /**
+   * Finds the parent router if this router is nested.
+   */
+  private findParentRouter(
+    target: RouterDefinition,
+  ): RouterDefinition | undefined {
+    return this.searchRouters((router) => router.children.includes(target))
+  }
+
+  /**
    * Finds the router that contains this route.
    */
   private findParentRouterForRoute(
     target: RouteDefinition,
   ): RouterDefinition | undefined {
-    const searchIn = (
-      routers: RouterDefinition[],
-    ): RouterDefinition | undefined => {
-      for (const router of routers) {
-        if (router.routes.includes(target)) {
-          return router
-        }
-        const found = searchIn(router.children)
-        if (found) return found
-      }
-      return undefined
-    }
+    return this.searchRouters((router) => router.routes.includes(target))
+  }
 
-    for (const app of this.apps) {
-      const found = searchIn(app.routers)
-      if (found) return found
+  /**
+   * Calculates the relative path given a full path and a parent prefix.
+   * Returns the path relative to the parent, or the original if no meaningful parent.
+   */
+  private getRelativePath(fullPath: string, parentPrefix: string): string {
+    if (parentPrefix === "/") {
+      return fullPath
     }
-    return undefined
+    if (fullPath.startsWith(`${parentPrefix}/`)) {
+      return fullPath.slice(parentPrefix.length)
+    }
+    if (fullPath.startsWith(parentPrefix)) {
+      return fullPath.slice(parentPrefix.length) || "/"
+    }
+    return fullPath
+  }
+
+  /**
+   * Sorts and maps routers to tree items.
+   */
+  private sortedRouterItems(
+    routers: RouterDefinition[],
+  ): { type: "router"; router: RouterDefinition }[] {
+    return routers
+      .map((router) => ({ type: "router" as const, router }))
+      .sort((a, b) =>
+        this.getRouterSortKey(a.router).localeCompare(
+          this.getRouterSortKey(b.router),
+        ),
+      )
+  }
+
+  /**
+   * Sorts and maps routes to tree items.
+   */
+  private sortedRouteItems(
+    routes: RouteDefinition[],
+  ): { type: "route"; route: RouteDefinition }[] {
+    return routes
+      .map((route) => ({ type: "route" as const, route }))
+      .sort((a, b) =>
+        this.getRouteSortKey(a.route).localeCompare(
+          this.getRouteSortKey(b.route),
+        ),
+      )
   }
 
   getParent(element: EndpointTreeItem): EndpointTreeItem | undefined {
@@ -196,14 +234,13 @@ export class EndpointTreeProvider
       }
 
       case "route": {
-        // Check if route belongs to a router
+        // Check if route belongs to a router (including nested routers)
+        const parentRouter = this.findParentRouterForRoute(element.route)
+        if (parentRouter) {
+          return { type: "router", router: parentRouter }
+        }
+        // Check if route is directly on an app
         for (const app of this.apps) {
-          for (const router of app.routers) {
-            if (router.routes.includes(element.route)) {
-              return { type: "router", router }
-            }
-          }
-          // Check if route is directly on the app
           if (app.routes.includes(element.route)) {
             return { type: "app", app }
           }
@@ -226,53 +263,17 @@ export class EndpointTreeProvider
         return element.apps
           .map((app) => ({ type: "app" as const, app }))
           .sort((a, b) => a.app.name.localeCompare(b.app.name))
-      case "app": {
-        const routers = element.app.routers
-          .map((router) => ({
-            type: "router" as const,
-            router,
-          }))
-          .sort((a, b) =>
-            this.getRouterSortKey(a.router).localeCompare(
-              this.getRouterSortKey(b.router),
-            ),
-          )
-        const routes = element.app.routes
-          .map((route) => ({
-            type: "route" as const,
-            route,
-          }))
-          .sort((a, b) =>
-            this.getRouteSortKey(a.route).localeCompare(
-              this.getRouteSortKey(b.route),
-            ),
-          )
-        return [...routers, ...routes]
-      }
-      case "router": {
+      case "app":
+        return [
+          ...this.sortedRouterItems(element.app.routers),
+          ...this.sortedRouteItems(element.app.routes),
+        ]
+      case "router":
         // Child routers first, then routes
-        const childRouters = element.router.children
-          .map((router) => ({
-            type: "router" as const,
-            router,
-          }))
-          .sort((a, b) =>
-            this.getRouterSortKey(a.router).localeCompare(
-              this.getRouterSortKey(b.router),
-            ),
-          )
-        const routes = element.router.routes
-          .map((route) => ({
-            type: "route" as const,
-            route,
-          }))
-          .sort((a, b) =>
-            this.getRouteSortKey(a.route).localeCompare(
-              this.getRouteSortKey(b.route),
-            ),
-          )
-        return [...childRouters, ...routes]
-      }
+        return [
+          ...this.sortedRouterItems(element.router.children),
+          ...this.sortedRouteItems(element.router.routes),
+        ]
       case "route":
       case "message":
         return []
@@ -334,25 +335,28 @@ export class EndpointTreeProvider
 
         // If nested under a parent router, show only the relative part
         const parentRouter = this.findParentRouter(element.router)
-        let displayPrefix = strippedPrefix
-        if (parentRouter) {
-          const parentPrefix = stripLeadingDynamicSegments(parentRouter.prefix)
-          if (strippedPrefix.startsWith(parentPrefix + "/")) {
-            displayPrefix = strippedPrefix.slice(parentPrefix.length)
-          } else if (strippedPrefix.startsWith(parentPrefix)) {
-            displayPrefix = strippedPrefix.slice(parentPrefix.length) || "/"
-          }
-        }
+        const parentPrefix = parentRouter
+          ? stripLeadingDynamicSegments(parentRouter.prefix)
+          : "/"
+        const displayPrefix = this.getRelativePath(strippedPrefix, parentPrefix)
 
         let routerLabel = displayPrefix !== "/" ? displayPrefix : ""
         if (!routerLabel) {
           if (element.router.tags.length > 0) {
             // Add / prefix to tag-based labels for consistency
-            routerLabel = "/" + element.router.tags[0]
+            routerLabel = `/${element.router.tags[0]}`
           } else {
+            // Use parent directory + filename for context (e.g., "integrations/router")
             const filePath = element.router.location.filePath
-            const fileName = filePath.split("/").pop() ?? ""
-            routerLabel = fileName.replace(/\.py$/, "")
+            const parts = filePath.split("/")
+            const fileName = parts.pop()?.replace(/\.py$/, "") ?? ""
+            const parentDir = parts.pop() ?? ""
+            // Skip generic parent dirs like "routes" or "api"
+            if (parentDir && !GENERIC_PARENT_DIRS.has(parentDir)) {
+              routerLabel = `${parentDir}/${fileName}`
+            } else {
+              routerLabel = fileName
+            }
           }
         }
         const routerItem = new TreeItem(
@@ -379,26 +383,14 @@ export class EndpointTreeProvider
 
         // Find parent router to show relative path
         const parentRouter = this.findParentRouterForRoute(element.route)
-        let displayPath = strippedPath
-        if (parentRouter) {
-          const parentPrefix = stripLeadingDynamicSegments(parentRouter.prefix)
-          // Only make relative if parent has a meaningful prefix (not just "/")
-          if (
-            parentPrefix !== "/" &&
-            strippedPath.startsWith(parentPrefix + "/")
-          ) {
-            displayPath = strippedPath.slice(parentPrefix.length)
-          } else if (
-            parentPrefix !== "/" &&
-            strippedPath.startsWith(parentPrefix)
-          ) {
-            displayPath = strippedPath.slice(parentPrefix.length) || "/"
-          }
-          // If parent prefix is "/" (no real prefix), show the full path
-        }
+        const parentPrefix = parentRouter
+          ? stripLeadingDynamicSegments(parentRouter.prefix)
+          : "/"
+        let displayPath = this.getRelativePath(strippedPath, parentPrefix)
+
         // Ensure path starts with / and doesn't end with / (unless it's just "/")
         if (!displayPath.startsWith("/")) {
-          displayPath = "/" + displayPath
+          displayPath = `/${displayPath}`
         }
         if (displayPath.length > 1 && displayPath.endsWith("/")) {
           displayPath = displayPath.slice(0, -1)

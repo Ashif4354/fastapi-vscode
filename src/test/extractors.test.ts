@@ -1,10 +1,11 @@
 import * as assert from "node:assert"
 import * as path from "node:path"
-import { findNodesByType } from "../core/astUtils"
 import {
   decoratorExtractor,
+  findNodesByType,
   importExtractor,
   includeRouterExtractor,
+  mountExtractor,
   routerExtractor,
 } from "../core/extractors"
 import { Parser } from "../core/parser"
@@ -199,7 +200,7 @@ def handler():
   suite("routerExtractor", () => {
     test("extracts FastAPI app instantiation", () => {
       const code = "app = FastAPI()"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = routerExtractor(assignments[0])
 
@@ -211,7 +212,7 @@ def handler():
 
     test("extracts APIRouter instantiation", () => {
       const code = "router = APIRouter()"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = routerExtractor(assignments[0])
 
@@ -222,7 +223,7 @@ def handler():
 
     test("extracts APIRouter with prefix", () => {
       const code = `router = APIRouter(prefix="/users")`
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = routerExtractor(assignments[0])
 
@@ -232,7 +233,7 @@ def handler():
 
     test("extracts APIRouter with tags", () => {
       const code = `router = APIRouter(tags=["users", "admin"])`
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = routerExtractor(assignments[0])
 
@@ -242,7 +243,7 @@ def handler():
 
     test("extracts APIRouter with prefix and tags", () => {
       const code = `router = APIRouter(prefix="/api", tags=["api"])`
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = routerExtractor(assignments[0])
 
@@ -253,7 +254,7 @@ def handler():
 
     test("handles dynamic prefix", () => {
       const code = "router = APIRouter(prefix=settings.API_PREFIX)"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = routerExtractor(assignments[0])
 
@@ -263,7 +264,7 @@ def handler():
 
     test("returns null for non-router assignment", () => {
       const code = "x = 5"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = routerExtractor(assignments[0])
 
@@ -272,7 +273,7 @@ def handler():
 
     test("returns null for other function call", () => {
       const code = "result = some_function()"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = routerExtractor(assignments[0])
 
@@ -283,7 +284,7 @@ def handler():
   suite("importExtractor", () => {
     test("extracts simple import", () => {
       const code = "import fastapi"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const imports = findNodesByType(tree.rootNode, "import_statement")
       const result = importExtractor(imports[0])
 
@@ -295,7 +296,7 @@ def handler():
 
     test("extracts from import", () => {
       const code = "from fastapi import FastAPI"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const imports = findNodesByType(tree.rootNode, "import_from_statement")
       const result = importExtractor(imports[0])
 
@@ -307,7 +308,7 @@ def handler():
 
     test("extracts relative import with single dot", () => {
       const code = "from .routes import users"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const imports = findNodesByType(tree.rootNode, "import_from_statement")
       const result = importExtractor(imports[0])
 
@@ -319,7 +320,7 @@ def handler():
 
     test("extracts relative import with double dot", () => {
       const code = "from ..api import router"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const imports = findNodesByType(tree.rootNode, "import_from_statement")
       const result = importExtractor(imports[0])
 
@@ -331,7 +332,7 @@ def handler():
 
     test("extracts import with alias", () => {
       const code = "from .users import router as users_router"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const imports = findNodesByType(tree.rootNode, "import_from_statement")
       const result = importExtractor(imports[0])
 
@@ -344,7 +345,7 @@ def handler():
 
     test("extracts multiple imports", () => {
       const code = "from fastapi import FastAPI, APIRouter"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const imports = findNodesByType(tree.rootNode, "import_from_statement")
       const result = importExtractor(imports[0])
 
@@ -355,7 +356,7 @@ def handler():
 
     test("returns null for non-import node", () => {
       const code = "x = 5"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const assignments = findNodesByType(tree.rootNode, "assignment")
       const result = importExtractor(assignments[0])
 
@@ -366,7 +367,7 @@ def handler():
   suite("includeRouterExtractor", () => {
     test("extracts include_router call", () => {
       const code = "app.include_router(users.router)"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const calls = findNodesByType(tree.rootNode, "call")
       const result = includeRouterExtractor(calls[0])
 
@@ -378,7 +379,7 @@ def handler():
 
     test("extracts include_router with prefix", () => {
       const code = `app.include_router(users.router, prefix="/users")`
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const calls = findNodesByType(tree.rootNode, "call")
       const result = includeRouterExtractor(calls[0])
 
@@ -388,7 +389,7 @@ def handler():
 
     test("extracts include_router with dynamic prefix", () => {
       const code = "app.include_router(router, prefix=settings.PREFIX)"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const calls = findNodesByType(tree.rootNode, "call")
       const result = includeRouterExtractor(calls[0])
 
@@ -398,7 +399,7 @@ def handler():
 
     test("returns null for non-include_router call", () => {
       const code = "app.some_method(arg)"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const calls = findNodesByType(tree.rootNode, "call")
       const result = includeRouterExtractor(calls[0])
 
@@ -407,11 +408,89 @@ def handler():
 
     test("returns null for function call (not method)", () => {
       const code = "include_router(router)"
-      const tree = parser.parse(code)
+      const tree = parse(code)
       const calls = findNodesByType(tree.rootNode, "call")
       const result = includeRouterExtractor(calls[0])
 
       assert.strictEqual(result, null)
+    })
+  })
+
+  suite("mountExtractor", () => {
+    test("extracts mount call", () => {
+      const code = `app.mount("/static", static_app)`
+      const tree = parse(code)
+      const calls = findNodesByType(tree.rootNode, "call")
+      const result = mountExtractor(calls[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.object, "app")
+      assert.strictEqual(result.path, "/static")
+      assert.strictEqual(result.app, "static_app")
+    })
+
+    test("extracts mount with dynamic path", () => {
+      const code = "app.mount(settings.STATIC_PATH, static_app)"
+      const tree = parse(code)
+      const calls = findNodesByType(tree.rootNode, "call")
+      const result = mountExtractor(calls[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.path, "{settings.STATIC_PATH}")
+    })
+
+    test("returns null for non-mount call", () => {
+      const code = "app.some_method(arg1, arg2)"
+      const tree = parse(code)
+      const calls = findNodesByType(tree.rootNode, "call")
+      const result = mountExtractor(calls[0])
+
+      assert.strictEqual(result, null)
+    })
+
+    test("returns null for mount with missing arguments", () => {
+      const code = `app.mount("/static")`
+      const tree = parse(code)
+      const calls = findNodesByType(tree.rootNode, "call")
+      const result = mountExtractor(calls[0])
+
+      assert.strictEqual(result, null)
+    })
+  })
+
+  suite("decoratorExtractor path handling", () => {
+    test("handles concatenated strings", () => {
+      const code = `
+@router.get("/api" "/v1" "/users")
+def handler():
+    pass
+`
+      const tree = parse(code)
+      const decoratedDefs = findNodesByType(
+        tree.rootNode,
+        "decorated_definition",
+      )
+      const result = decoratorExtractor(decoratedDefs[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.path, "/api/v1/users")
+    })
+
+    test("handles function call as path", () => {
+      const code = `
+@router.get(get_path())
+def handler():
+    pass
+`
+      const tree = parse(code)
+      const decoratedDefs = findNodesByType(
+        tree.rootNode,
+        "decorated_definition",
+      )
+      const result = decoratorExtractor(decoratedDefs[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.path, "{get_path()}")
     })
   })
 })

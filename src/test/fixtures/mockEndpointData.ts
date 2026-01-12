@@ -1,5 +1,5 @@
+import type { AppDefinition } from "../../core/types"
 import type { EndpointTreeItem } from "../../providers/EndpointTreeProvider"
-import type { AppDefinition } from "../../types/endpoint"
 
 export const mockApps: AppDefinition[] = [
   {

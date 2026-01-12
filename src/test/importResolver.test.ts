@@ -161,7 +161,7 @@ suite("importResolver", () => {
       assert.ok(result.endsWith("users.py"))
     })
 
-    test("returns null for non-existent named import", () => {
+    test("falls back to base module for non-existent named import", () => {
       const currentFile = path.join(fixturesPath, "app", "api", "main.py")
       const projectRoot = fixturesPath
 
@@ -177,7 +177,11 @@ suite("importResolver", () => {
         parser,
       )
 
-      assert.strictEqual(result, null)
+      // Falls back to the base module when named import not found
+      assert.ok(result)
+      assert.ok(
+        result.endsWith("routes/__init__.py") || result.endsWith("routes.py"),
+      )
     })
   })
 })

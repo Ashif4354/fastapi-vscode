@@ -1,3 +1,7 @@
+/**
+ * Parser service using Web Tree Sitter to parse Python code.
+ */
+
 import { readFileSync } from "node:fs"
 import { Language, Parser as TreeSitterParser } from "web-tree-sitter"
 

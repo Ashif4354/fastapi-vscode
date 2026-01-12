@@ -1,35 +1,36 @@
-import type {
-  AppDefinition,
-  RouteDefinition,
-  RouteMethod,
-  RouterDefinition,
-} from "../types/endpoint"
+/**
+ * Transforms a RouterNode graph into an AppDefinition for consumption.
+ */
+
+import { normalizeMethod } from "./internal"
 import {
   countSegments,
   getPathSegments,
   stripLeadingDynamicSegments,
 } from "./pathUtils"
 import type { RouterNode } from "./routerResolver"
+import type { AppDefinition, RouteDefinition, RouterDefinition } from "./types"
 
-function normalizeMethod(method: string): RouteMethod {
-  const upper = method.toUpperCase()
-  if (
-    upper === "GET" ||
-    upper === "POST" ||
-    upper === "PUT" ||
-    upper === "DELETE" ||
-    upper === "PATCH" ||
-    upper === "OPTIONS" ||
-    upper === "HEAD"
-  ) {
-    return upper
+function toRouteDefinition(
+  route: RouterNode["routes"][number],
+  prefix: string,
+  filePath: string,
+): RouteDefinition {
+  return {
+    method: normalizeMethod(route.method),
+    path: prefix + route.path,
+    functionName: route.function,
+    location: {
+      filePath,
+      line: route.line,
+      column: route.column,
+    },
   }
-  if (upper === "WEBSOCKET") {
-    return "WEBSOCKET"
-  }
-  return "GET" // fallback
 }
 
+/**
+ * Collects routers into a flat list with full prefixes.
+ */
 function collectFlatRouters(
   node: RouterNode,
   parentPrefix: string,
@@ -38,16 +39,9 @@ function collectFlatRouters(
   const fullPrefix = parentPrefix + node.prefix
 
   // Convert routes from this node
-  const routes: RouteDefinition[] = node.routes.map((r) => ({
-    method: normalizeMethod(r.method),
-    path: fullPrefix + r.path,
-    functionName: r.function,
-    location: {
-      filePath: node.filePath,
-      line: r.line,
-      column: r.column,
-    },
-  }))
+  const routes = node.routes.map((r) =>
+    toRouteDefinition(r, fullPrefix, node.filePath),
+  )
 
   // Add this router (skip the root FastAPI app and routers with no routes)
   if (node.type === "APIRouter" && routes.length > 0) {
@@ -69,6 +63,24 @@ function collectFlatRouters(
   for (const child of node.children) {
     collectFlatRouters(child.router, fullPrefix + child.prefix, routers)
   }
+}
+
+/**
+ * Finds the nearest parent router by walking up the prefix hierarchy.
+ */
+function findParentRouter(
+  prefix: string,
+  segmentCount: number,
+  prefixToRouter: Map<string, RouterDefinition>,
+): RouterDefinition | undefined {
+  for (let i = segmentCount - 1; i >= 1; i--) {
+    const parentPrefix = getPathSegments(prefix, i)
+    const parent = prefixToRouter.get(parentPrefix)
+    if (parent) {
+      return parent
+    }
+  }
+  return undefined
 }
 
 /**
@@ -102,75 +114,74 @@ function buildPrefixHierarchy(
       continue
     }
 
-    // Check if a router with the exact same prefix already exists - merge into it
+    // Check if a router with the exact same prefix already exists - nest under it
     const existingRouter = prefixToRouter.get(strippedPrefix)
     if (existingRouter) {
-      // Merge routes and children into the existing router
-      existingRouter.routes.push(...router.routes)
-      existingRouter.children.push(...router.children)
+      // If existing is a synthetic group (no routes), add as child; otherwise merge
+      if (existingRouter.routes.length === 0 && router.routes.length > 0) {
+        existingRouter.children.push(router)
+      } else {
+        // Merge routes and children into the existing router
+        existingRouter.routes.push(...router.routes)
+        existingRouter.children.push(...router.children)
+      }
       continue
     }
 
     // Look for a parent at each level up
-    let foundParent = false
-    for (let i = segmentCount - 1; i >= 1; i--) {
-      const parentPrefix = getPathSegments(strippedPrefix, i)
-      const parent = prefixToRouter.get(parentPrefix)
-      if (parent) {
-        parent.children.push(router)
-        foundParent = true
-        break
-      }
+    const parent = findParentRouter(
+      strippedPrefix,
+      segmentCount,
+      prefixToRouter,
+    )
+    if (parent) {
+      parent.children.push(router)
+      prefixToRouter.set(strippedPrefix, router)
+      continue
     }
 
-    if (!foundParent) {
-      // No parent found - check if we should create a synthetic group
-      // Look for siblings that share the first segment but have DIFFERENT full prefixes
-      if (segmentCount >= 2) {
-        const groupPrefix = getPathSegments(strippedPrefix, 1)
-        let groupRouter = prefixToRouter.get(groupPrefix)
+    // No parent found - check if we should create a synthetic group
+    // Only for routers with 2+ segments (e.g., /integrations/neon)
+    if (segmentCount >= 2) {
+      const groupPrefix = getPathSegments(strippedPrefix, 1)
+      let groupRouter = prefixToRouter.get(groupPrefix)
 
-        if (!groupRouter) {
-          // Check if there will be other routers that would be NESTED siblings
-          // (sharing first segment but with DIFFERENT prefix - not same-prefix duplicates)
-          const wouldHaveNestedSiblings = sorted.some((other) => {
-            if (other === router) return false
-            const otherPrefix = stripLeadingDynamicSegments(other.prefix)
-            const otherSegments = countSegments(otherPrefix)
-            // Must share first segment AND have a different full prefix
-            return (
-              otherSegments >= 2 &&
-              getPathSegments(otherPrefix, 1) === groupPrefix &&
-              otherPrefix !== strippedPrefix
-            )
-          })
+      if (!groupRouter) {
+        // Check if there are other routers that would be siblings under this group
+        const wouldHaveSiblings = sorted.some((other) => {
+          if (other === router) return false
+          const otherPrefix = stripLeadingDynamicSegments(other.prefix)
+          const otherSegments = countSegments(otherPrefix)
+          return (
+            otherSegments >= 2 &&
+            getPathSegments(otherPrefix, 1) === groupPrefix &&
+            otherPrefix !== strippedPrefix
+          )
+        })
 
-          if (wouldHaveNestedSiblings) {
-            // Create a synthetic group router
-            groupRouter = {
-              name: groupPrefix.replace(/^\//, ""),
-              prefix: groupPrefix,
-              tags: [],
-              location: router.location, // Use first child's location
-              routes: [],
-              children: [],
-            }
-            prefixToRouter.set(groupPrefix, groupRouter)
-            rootRouters.push(groupRouter)
+        if (wouldHaveSiblings) {
+          // Create a synthetic group router
+          groupRouter = {
+            name: groupPrefix.replace(/^\//, ""),
+            prefix: groupPrefix,
+            tags: [],
+            location: router.location,
+            routes: [],
+            children: [],
           }
+          prefixToRouter.set(groupPrefix, groupRouter)
+          rootRouters.push(groupRouter)
         }
+      }
 
-        if (groupRouter) {
-          groupRouter.children.push(router)
-          foundParent = true
-        }
+      if (groupRouter) {
+        groupRouter.children.push(router)
+        prefixToRouter.set(strippedPrefix, router)
+        continue
       }
     }
 
-    if (!foundParent) {
-      rootRouters.push(router)
-    }
-
+    rootRouters.push(router)
     prefixToRouter.set(strippedPrefix, router)
   }
 
@@ -185,16 +196,9 @@ export function routerNodeToAppDefinition(
   const flatRouters: RouterDefinition[] = []
 
   // Collect direct routes on the FastAPI app
-  const directRoutes: RouteDefinition[] = rootNode.routes.map((r) => ({
-    method: normalizeMethod(r.method),
-    path: rootNode.prefix + r.path,
-    functionName: r.function,
-    location: {
-      filePath: rootNode.filePath,
-      line: r.line,
-      column: r.column,
-    },
-  }))
+  const directRoutes = rootNode.routes.map((r) =>
+    toRouteDefinition(r, rootNode.prefix, rootNode.filePath),
+  )
 
   // Collect all routers flat first
   for (const child of rootNode.children) {

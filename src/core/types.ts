@@ -1,39 +1,44 @@
-import type { RouterType } from "./extractors"
+/**
+ * Public API types for FastAPI endpoint discovery.
+ */
 
-export interface RouteInfo {
-  object: string
-  method: string
-  path: string
-  function: string
+export type HTTPMethod =
+  | "GET"
+  | "POST"
+  | "PUT"
+  | "DELETE"
+  | "PATCH"
+  | "OPTIONS"
+  | "HEAD"
+
+export type RouteMethod = HTTPMethod | "WEBSOCKET"
+
+export interface SourceLocation {
+  filePath: string
   line: number
   column: number
 }
 
-export interface RouterInfo {
-  variableName: string
-  type: RouterType
+export interface RouteDefinition {
+  method: RouteMethod
+  path: string
+  functionName: string
+  location: SourceLocation
+}
+
+export interface RouterDefinition {
+  name: string
   prefix: string
-  line: number
+  tags: string[]
+  location: SourceLocation
+  routes: RouteDefinition[]
+  children: RouterDefinition[] // Nested routers (by prefix hierarchy)
 }
 
-export interface IncludeRouterInfo {
-  object: string
-  router: string
-  prefix: string
-  line: number
-}
-
-export interface ImportInfo {
-  module: string
-  names: string[]
-  isRelative: boolean
-  relativeDots: number
-}
-
-export interface FileAnalysis {
+export interface AppDefinition {
+  name: string
   filePath: string
-  routes: RouteInfo[]
-  routers: RouterInfo[]
-  includesRouter: IncludeRouterInfo[]
-  imports: ImportInfo[]
+  workspaceFolder: string // Needed for multi-root workspaces
+  routers: RouterDefinition[]
+  routes: RouteDefinition[] // Direct routes on the app
 }

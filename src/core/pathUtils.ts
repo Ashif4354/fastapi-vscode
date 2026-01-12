@@ -1,5 +1,3 @@
-// Utility functions for URL path manipulation
-
 /**
  * Strips leading dynamic segments (like {settings.API_V1_STR}) from a path.
  * These are runtime variables, not URL path parameters.
@@ -25,7 +23,7 @@ export function stripLeadingDynamicSegments(path: string): string {
 export function getPathSegments(path: string, count: number): string {
   const segments = path.split("/").filter(Boolean)
   if (count >= segments.length) return path
-  return "/" + segments.slice(0, count).join("/")
+  return `/${segments.slice(0, count).join("/")}`
 }
 
 /**

@@ -1,32 +1,22 @@
-import fs from "node:fs"
-import path from "node:path"
-import { analyzeFile, type FileAnalysis } from "./analyzer"
-import type { RouterType } from "./extractors"
-import {
-  resolveImport,
-  resolveNamedImport,
-  resolveRouterFromInit,
-} from "./importResolver"
+import { existsSync } from "node:fs"
+import { isAbsolute, join } from "node:path"
+import { analyzeFile } from "./analyzer"
+import { resolveNamedImport, resolveRouterFromInit } from "./importResolver"
+import type { FileAnalysis, RouterInfo, RouterNode } from "./internal"
 import type { Parser } from "./parser"
 
-export interface RouterNode {
-  filePath: string
-  variableName: string
-  type: RouterType
-  prefix: string
-  tags: string[]
-  line: number
-  column: number
-  routes: {
-    method: string
-    path: string
-    function: string
-    line: number
-    column: number
-  }[]
-  children: { router: RouterNode; prefix: string }[]
+export type { RouterNode }
+
+/**
+ * Finds the main FastAPI app or APIRouter in the list of routers.
+ */
+function findAppRouter(routers: RouterInfo[]): RouterInfo | undefined {
+  return routers.find((r) => r.type === "FastAPI" || r.type === "APIRouter")
 }
 
+/**
+ * Builds a router graph starting from the given entry file.
+ */
 export function buildRouterGraph(
   entryFile: string,
   parser: Parser,
@@ -35,6 +25,9 @@ export function buildRouterGraph(
   return buildRouterGraphInternal(entryFile, parser, projectRoot, new Set())
 }
 
+/**
+ * Internal recursive function to build the router graph.
+ */
 function buildRouterGraphInternal(
   entryFile: string,
   parser: Parser,
@@ -43,12 +36,12 @@ function buildRouterGraphInternal(
 ): RouterNode | null {
   // Resolve the full path of the entry file if necessary
   let resolvedEntryFile = entryFile
-  if (!fs.existsSync(resolvedEntryFile)) {
+  if (!existsSync(resolvedEntryFile)) {
     // Only try joining if entryFile is not already absolute
-    if (!path.isAbsolute(entryFile)) {
-      resolvedEntryFile = path.join(projectRoot, entryFile)
+    if (!isAbsolute(entryFile)) {
+      resolvedEntryFile = join(projectRoot, entryFile)
     }
-    if (!fs.existsSync(resolvedEntryFile)) {
+    if (!existsSync(resolvedEntryFile)) {
       return null
     }
   }
@@ -57,6 +50,7 @@ function buildRouterGraphInternal(
   if (visited.has(resolvedEntryFile)) {
     return null
   }
+
   visited.add(resolvedEntryFile)
 
   // Analyze the entry file
@@ -66,11 +60,9 @@ function buildRouterGraphInternal(
   }
 
   // Find FastAPI instantiation
-  let appRouter = analysis.routers.find(
-    (r) => r.type === "FastAPI" || r.type === "APIRouter",
-  )
+  let appRouter = findAppRouter(analysis.routers)
 
-  // If no router found and this is an __init__.py, check for re-exports
+  // If no FastAPI/APIRouter found and this is an __init__.py, check for re-exports
   if (!appRouter && resolvedEntryFile.endsWith("__init__.py")) {
     const actualRouterFile = resolveRouterFromInit(
       resolvedEntryFile,
@@ -79,14 +71,12 @@ function buildRouterGraphInternal(
     )
     if (actualRouterFile && !visited.has(actualRouterFile)) {
       visited.add(actualRouterFile)
-      // Re-analyze the actual file containing the router
-      analysis = analyzeFile(actualRouterFile, parser)
-      if (analysis) {
-        appRouter = analysis.routers.find(
-          (r) => r.type === "FastAPI" || r.type === "APIRouter",
-        )
-        // Update the resolved path to the actual file
-        if (appRouter) {
+      const actualAnalysis = analyzeFile(actualRouterFile, parser)
+      if (actualAnalysis) {
+        const actualRouter = findAppRouter(actualAnalysis.routers)
+        if (actualRouter) {
+          analysis = actualAnalysis
+          appRouter = actualRouter
           resolvedEntryFile = actualRouterFile
         }
       }
@@ -177,7 +167,7 @@ function resolveRouterReference(
     return null
   }
 
-  let importedFilePath = resolveNamedImport(
+  const importedFilePath = resolveNamedImport(
     {
       modulePath: matchingImport.modulePath,
       names: [moduleName],
@@ -190,25 +180,13 @@ function resolveRouterReference(
   )
 
   if (!importedFilePath) {
-    importedFilePath = resolveImport(
-      {
-        modulePath: matchingImport.modulePath,
-        isRelative: matchingImport.isRelative,
-        relativeDots: matchingImport.relativeDots,
-      },
-      currentFile,
-      projectRoot,
-    )
+    return null
   }
 
-  if (importedFilePath) {
-    return buildRouterGraphInternal(
-      importedFilePath,
-      parser,
-      projectRoot,
-      visited,
-    )
-  }
-
-  return null
+  return buildRouterGraphInternal(
+    importedFilePath,
+    parser,
+    projectRoot,
+    visited,
+  )
 }

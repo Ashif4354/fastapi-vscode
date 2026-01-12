@@ -1,50 +1,83 @@
-import * as fs from "node:fs"
+import { existsSync } from "node:fs"
+import { dirname } from "node:path"
 import { analyzeFile } from "./analyzer"
+import type { ImportInfo } from "./internal"
 import type { Parser } from "./parser"
 
+/**
+ * Resolves a module path to its Python file.
+ * Checks for direct .py file first, then package __init__.py
+ * (matching Python's import resolution order).
+ */
+function resolvePythonModule(basePath: string): string | null {
+  if (existsSync(`${basePath}.py`)) {
+    return `${basePath}.py`
+  }
+  if (existsSync(`${basePath}/__init__.py`)) {
+    return `${basePath}/__init__.py`
+  }
+  return null
+}
+
+/**
+ * Finds an import that provides a given exported name
+ * Used for resolving re-exports in __init__.py files
+ **/
+function findImportByExportedName(
+  imports: ImportInfo[],
+  name: string,
+): ImportInfo | null {
+  // Each import may provide multiple named imports
+  // e.g. from module import A as B, C
+  for (const imp of imports) {
+    for (const namedImport of imp.namedImports) {
+      const providedName = namedImport.alias ?? namedImport.name
+      if (providedName === name) {
+        return imp
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Base resolution of a module import to its file path.
+ * Handles both relative and absolute imports.
+ */
 export function resolveImport(
-  importInfo: { modulePath: string; isRelative: boolean; relativeDots: number },
+  importInfo: Pick<ImportInfo, "modulePath" | "isRelative" | "relativeDots">,
   currentFilePath: string,
   projectRoot: string,
 ): string | null {
-  let resolvedPath = ""
+  let resolvedPath: string
 
   if (importInfo.isRelative) {
-    // For relative imports, slice off 'relativeDots' path segments:
-    // - 1 dot: remove filename → current directory
-    // - 2 dots: remove filename + 1 dir → parent directory
-    const currentDir = currentFilePath
-      .split("/")
-      .slice(0, -1 * importInfo.relativeDots)
-      .join("/")
-    const moduleSuffix = importInfo.modulePath
-      ? `/${importInfo.modulePath.replace(/\./g, "/")}`
-      : ""
-    resolvedPath = `${currentDir}${moduleSuffix}`
+    // For relative imports, go up 'relativeDots' directories from current file
+    let currentDir = dirname(currentFilePath)
+    for (let i = 1; i < importInfo.relativeDots; i++) {
+      currentDir = dirname(currentDir)
+    }
+    resolvedPath = importInfo.modulePath
+      ? `${currentDir}/${importInfo.modulePath.replace(/\./g, "/")}`
+      : currentDir
+    // Absolute import
   } else {
     resolvedPath = `${projectRoot}/${importInfo.modulePath.replace(/\./g, "/")}`
   }
 
-  // check for .py file
-  if (fs.existsSync(`${resolvedPath}.py`)) {
-    return `${resolvedPath}.py`
-  }
-
-  // check for __init__.py in directory
-  if (fs.existsSync(`${resolvedPath}/__init__.py`)) {
-    return `${resolvedPath}/__init__.py`
-  }
-
-  return null
+  return resolvePythonModule(resolvedPath)
 }
 
+/**
+ * Resolves a named import to its file path.
+ * For example, from .routes import users
+ * will try to resolve to routes/users.py
+ */
 export function resolveNamedImport(
-  importInfo: {
-    modulePath: string
-    names: string[]
-    isRelative: boolean
-    relativeDots: number
-  },
+  importInfo: Pick<
+    ImportInfo,
+    "modulePath" | "names" | "isRelative" | "relativeDots"
+  >,
   currentFilePath: string,
   projectRoot: string,
   parser?: Parser,
@@ -54,80 +87,37 @@ export function resolveNamedImport(
     return null
   }
 
+  const baseDir = dirname(basePath)
+
   for (const name of importInfo.names) {
-    const baseDir = basePath.split("/").slice(0, -1).join("/")
-    const namedPath = baseDir + "/" + name.replace(/\./g, "/")
-
-    // check for .py file
-    if (fs.existsSync(`${namedPath}.py`)) {
-      return `${namedPath}.py`
+    // Try direct file: from .routes import users -> routes/users.py
+    const namedPath = `${baseDir}/${name.replace(/\./g, "/")}`
+    const resolved = resolvePythonModule(namedPath)
+    if (resolved) {
+      return resolved
     }
 
-    // check for __init__.py in directory
-    if (fs.existsSync(`${namedPath}/__init__.py`)) {
-      return `${namedPath}/__init__.py`
-    }
-
-    // If the base path is an __init__.py, check for re-exports
+    // Try re-exports: from .routes import users where routes/__init__.py re-exports users
     if (basePath.endsWith("__init__.py") && parser) {
-      const resolved = resolveReExport(basePath, name, projectRoot, parser)
-      if (resolved) {
-        return resolved
-      }
-    }
-  }
-
-  return null
-}
-
-/**
- * Resolves a re-export from an __init__.py file.
- * For example, if __init__.py contains:
- *   from .users import router as users_router
- * And we're looking for "users_router", this will return the path to users.py
- */
-function resolveReExport(
-  initFilePath: string,
-  exportedName: string,
-  projectRoot: string,
-  parser: Parser,
-): string | null {
-  const analysis = analyzeFile(initFilePath, parser)
-  if (!analysis) {
-    return null
-  }
-
-  // Look through imports to find one that exports the name we're looking for
-  for (const imp of analysis.imports) {
-    for (const namedImport of imp.namedImports) {
-      // Check if this import provides the name we're looking for
-      // Either as an alias or as the original name
-      const providedName = namedImport.alias ?? namedImport.name
-      if (providedName === exportedName) {
-        // Found it! Now resolve where it comes from
-        // The modulePath in the import is relative to the __init__.py location
-        const resolved = resolveImport(
-          {
-            modulePath: imp.modulePath,
-            isRelative: imp.isRelative,
-            relativeDots: imp.relativeDots,
-          },
-          initFilePath,
-          projectRoot,
-        )
-        if (resolved) {
-          return resolved
+      const analysis = analyzeFile(basePath, parser)
+      const imp = analysis && findImportByExportedName(analysis.imports, name)
+      if (imp) {
+        const reExportResolved = resolveImport(imp, basePath, projectRoot)
+        if (reExportResolved) {
+          return reExportResolved
         }
       }
     }
   }
 
-  return null
+  // Fall back to base module resolution
+  return basePath
 }
 
 /**
  * When an __init__.py has no router definitions but re-exports a router,
  * this function finds the actual file containing the router.
+ *
  * For example, if integrations/__init__.py contains:
  *   from .router import router as router
  * This will return the path to integrations/router.py
@@ -151,27 +141,9 @@ export function resolveRouterFromInit(
     return null
   }
 
-  // Look for a re-exported "router" variable
-  for (const imp of analysis.imports) {
-    for (const namedImport of imp.namedImports) {
-      // Look for imports that provide a "router" name
-      const providedName = namedImport.alias ?? namedImport.name
-      if (providedName === "router") {
-        // Resolve where the router comes from
-        const resolved = resolveImport(
-          {
-            modulePath: imp.modulePath,
-            isRelative: imp.isRelative,
-            relativeDots: imp.relativeDots,
-          },
-          initFilePath,
-          projectRoot,
-        )
-        if (resolved) {
-          return resolved
-        }
-      }
-    }
+  const imp = findImportByExportedName(analysis.imports, "router")
+  if (imp) {
+    return resolveImport(imp, initFilePath, projectRoot)
   }
 
   return null

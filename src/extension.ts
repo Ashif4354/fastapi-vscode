@@ -1,13 +1,16 @@
-// VSCode extension entry point
+/**
+ * VSCode extension entry point for FastAPI endpoint discovery.
+ */
+
 import * as vscode from "vscode"
 import { Parser } from "./core/parser"
 import { buildRouterGraph } from "./core/routerResolver"
 import { routerNodeToAppDefinition } from "./core/transformer"
+import type { AppDefinition, SourceLocation } from "./core/types"
 import {
   type EndpointTreeItem,
   EndpointTreeProvider,
 } from "./providers/EndpointTreeProvider"
-import type { AppDefinition, SourceLocation } from "./types/endpoint"
 
 async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
   const apps: AppDefinition[] = []

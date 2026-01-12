@@ -1,61 +1,37 @@
-// Utility functions to extract information from AST nodes
+/**
+ * Utility functions to extract FastAPI-related information from AST nodes.
+ */
 
 import type { Node } from "web-tree-sitter"
-import { ROUTE_METHODS } from "../types/endpoint"
-import { findNodesByType } from "./astUtils"
+import type {
+  ImportedName,
+  ImportInfo,
+  IncludeRouterInfo,
+  MountInfo,
+  RouteInfo,
+  RouterInfo,
+  RouterType,
+} from "./internal"
+import { ROUTE_METHODS } from "./internal"
 
-// ============================================================================
-// Extractor result types
-// ============================================================================
-
-export interface RouteInfo {
-  object: string
-  method: string
-  path: string
-  function: string
-  line: number
-  column: number
+/** Recursively finds all nodes of a given type within a subtree */
+export function findNodesByType(node: Node, type: string): Node[] {
+  const results: Node[] = []
+  collectNodesByType(node, type, results)
+  return results
 }
 
-export type RouterType = "APIRouter" | "FastAPI" | "Unknown"
-
-export interface RouterInfo {
-  variableName: string
-  type: RouterType
-  prefix: string
-  tags: string[]
-  line: number
-  column: number
+function collectNodesByType(node: Node, type: string, results: Node[]): void {
+  if (node.type === type) {
+    results.push(node)
+  }
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i)
+    if (child) {
+      collectNodesByType(child, type, results)
+    }
+  }
 }
-
-export interface ImportedName {
-  name: string
-  alias: string | null
-}
-
-export interface ImportInfo {
-  modulePath: string
-  names: string[]
-  namedImports: ImportedName[]
-  isRelative: boolean
-  relativeDots: number
-}
-
-export interface IncludeRouterInfo {
-  object: string
-  router: string
-  prefix: string
-}
-
-export interface MountInfo {
-  object: string
-  path: string
-  app: string
-}
-
-// ============================================================================
-// Extractors
-// ============================================================================
 
 /**
  * Extracts a path string from various AST node types.
@@ -65,8 +41,8 @@ function extractPathFromNode(node: Node): string {
   switch (node.type) {
     case "string":
       // Plain string: "/users" or f-string: f"/users/{id}"
-      // For f-strings, we want to preserve the interpolation syntax
-      return node.text.slice(1, -1) // Remove outer quotes
+      // For f-strings, preserve the interpolation syntax
+      return node.text.slice(1, -1)
 
     case "concatenated_string":
       // Adjacent strings: "/api" "/v1" -> "/api/v1"
@@ -87,15 +63,9 @@ function extractPathFromNode(node: Node): string {
     }
 
     case "identifier":
-      // Variable reference: BASE_PATH -> {BASE_PATH}
-      return `{${node.text}}`
-
     case "attribute":
-      // Attribute access: config.BASE_PATH -> {config.BASE_PATH}
-      return `{${node.text}}`
-
     case "call":
-      // Function call: get_path() -> {get_path()}
+      // Dynamic values: variable, attribute access, or function call
       return `{${node.text}}`
 
     default:
@@ -131,7 +101,7 @@ export function decoratorExtractor(node: Node): RouteInfo | null {
     return null
   }
 
-  // Filter out non-route decorators like exception_handler, middleware, on_event
+  // Filter out non-route decorators (exception_handler, middleware, on_event)
   const method = methodNode.text.toLowerCase()
   const isApiRoute = method === "api_route"
   if (!ROUTE_METHODS.has(method) && !isApiRoute) {
@@ -154,10 +124,10 @@ export function decoratorExtractor(node: Node): RouteInfo | null {
         const nameNode = argNode.childForFieldName("name")
         const valueNode = argNode.childForFieldName("value")
         if (nameNode?.text === "methods" && valueNode) {
-          // Extract first method from list like ["GET", "POST"]
+          // Extract first method from list
           const listItems = valueNode.namedChildren
           if (listItems.length > 0 && listItems[0].type === "string") {
-            resolvedMethod = listItems[0].text.slice(1, -1) // Remove quotes
+            resolvedMethod = listItems[0].text.slice(1, -1)
           }
         }
       }
@@ -216,10 +186,9 @@ export function routerExtractor(node: Node): RouterInfo | null {
         if (argName === "prefix" && argValue) {
           prefix = extractPathFromNode(argValue)
         } else if (argName === "tags" && argValue?.type === "list") {
-          // Extract tags from list like ["login", "auth"]
           for (const elem of argValue.namedChildren) {
             if (elem.type === "string") {
-              tags.push(elem.text.slice(1, -1)) // Remove quotes
+              tags.push(elem.text.slice(1, -1))
             }
           }
         }
@@ -255,7 +224,6 @@ export function importExtractor(node: Node): ImportInfo | null {
   let relativeDots = 0
 
   if (node.type === "import_statement") {
-    // import_statement has "name" field, not "module_name"
     const nameNodes = findNodesByType(node, "dotted_name")
     for (const nameNode of nameNodes) {
       modulePath = nameNode.text
@@ -291,10 +259,9 @@ export function importExtractor(node: Node): ImportInfo | null {
     }
   }
 
-  // Also get non-aliased imports (dotted_name nodes that aren't part of aliased_import)
+  // Get non-aliased imports (dotted_name nodes not inside aliased_import)
   if (node.type === "import_from_statement") {
     const nameNodes = findNodesByType(node, "dotted_name")
-    // Skip the first one (module path) and any that are children of aliased_import
     for (let i = 1; i < nameNodes.length; i++) {
       const nameNode = nameNodes[i]
       // Check if this node is inside an aliased_import
@@ -329,7 +296,6 @@ export function includeRouterExtractor(node: Node): IncludeRouterInfo | null {
 
   const objectNode = functionNameNode.childForFieldName("object")
   const methodNode = functionNameNode.childForFieldName("attribute")
-
   if (!objectNode || !methodNode || methodNode.text !== "include_router") {
     return null
   }
@@ -376,7 +342,6 @@ export function mountExtractor(node: Node): MountInfo | null {
 
   const objectNode = functionNameNode.childForFieldName("object")
   const methodNode = functionNameNode.childForFieldName("attribute")
-
   if (!objectNode || !methodNode || methodNode.text !== "mount") {
     return null
   }
@@ -399,12 +364,9 @@ export function mountExtractor(node: Node): MountInfo | null {
     return null
   }
 
-  const path = extractPathFromNode(pathArg)
-  const app = appArg.text
-
   return {
     object: objectNode.text,
-    path,
-    app,
+    path: extractPathFromNode(pathArg),
+    app: appArg.text,
   }
 }
