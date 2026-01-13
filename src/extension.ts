@@ -132,7 +132,7 @@ export async function activate(context: vscode.ExtensionContext) {
   })
 
   const config = vscode.workspace.getConfiguration("fastapi")
-  const codeLensEnabled = config.get<boolean>("testCodeLenses", true)
+  const codeLensEnabled = config.get<boolean>("showTestCodeLenses", true)
 
   let codeLensDisposable: vscode.Disposable | undefined
   if (codeLensEnabled) {
