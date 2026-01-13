@@ -6,9 +6,9 @@ A VS Code extension for FastAPI development that discovers and displays your API
 
 - Automatic discovery of FastAPI routes and routers
 - Tree view showing all endpoints organized by router
-- Click to navigate to route definitions
+- Click to navigate to route definitions from the endpoint explorer
 - Supports `include_router` chains with prefix resolution
-- CodeLens in test files to jump from test client calls to route definitions
+- CodeLens in test files to jump from test client calls to routes
 
 ## Settings
 
