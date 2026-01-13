@@ -194,7 +194,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand(
-      "fastapi-vscode.goToPathOperation",
+      "fastapi-vscode.goToRoute",
       async (
         locations: SourceLocation[],
         sourceUri?: vscode.Uri,

@@ -1,10 +1,18 @@
 /**
  * CodeLens provider for FastAPI test client HTTP calls.
- * Shows "Go to path operation" links above test client method calls.
+ * Shows "Go to route" links above test client method calls.
  */
 
-import * as vscode from "vscode"
-import { findNodesByType } from "../core/extractors"
+import {
+  CodeLens,
+  type CodeLensProvider,
+  EventEmitter,
+  Position,
+  Range,
+  type TextDocument,
+} from "vscode"
+import type { Node } from "web-tree-sitter"
+import { extractStringValue, findNodesByType } from "../core/extractors"
 import { ROUTE_METHODS } from "../core/internal"
 import type { Parser } from "../core/parser"
 import {
@@ -25,10 +33,10 @@ interface TestClientCall {
   column: number
 }
 
-export class TestClientCodeLensProvider implements vscode.CodeLensProvider {
+export class TestClientCodeLensProvider implements CodeLensProvider {
   private apps: AppDefinition[] = []
   private parser: Parser
-  private _onDidChangeCodeLenses = new vscode.EventEmitter<void>()
+  private _onDidChangeCodeLenses = new EventEmitter<void>()
   readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event
 
   constructor(parser: Parser, apps: AppDefinition[]) {
@@ -41,7 +49,7 @@ export class TestClientCodeLensProvider implements vscode.CodeLensProvider {
     this._onDidChangeCodeLenses.fire()
   }
 
-  provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
+  provideCodeLenses(document: TextDocument): CodeLens[] {
     const code = document.getText()
     const tree = this.parser.parse(code)
     if (!tree) {
@@ -50,24 +58,24 @@ export class TestClientCodeLensProvider implements vscode.CodeLensProvider {
 
     const testClientCalls = this.findTestClientCalls(tree.rootNode)
 
-    const codeLenses: vscode.CodeLens[] = []
+    const codeLenses: CodeLens[] = []
 
     for (const call of testClientCalls) {
       const matchingRoutes = this.findMatchingRoutes(call.path, call.method)
 
       if (matchingRoutes.length > 0) {
-        const range = new vscode.Range(
-          new vscode.Position(call.line, call.column),
-          new vscode.Position(call.line, call.column),
+        const range = new Range(
+          new Position(call.line, call.column),
+          new Position(call.line, call.column),
         )
 
         const methodUpper = call.method.toUpperCase()
         const displayPath = stripLeadingDynamicSegments(call.path)
-        const sourcePosition = new vscode.Position(call.line, call.column)
+        const sourcePosition = new Position(call.line, call.column)
         codeLenses.push(
-          new vscode.CodeLens(range, {
+          new CodeLens(range, {
             title: `Go to route: ${methodUpper} ${displayPath}`,
-            command: "fastapi-vscode.goToPathOperation",
+            command: "fastapi-vscode.goToRoute",
             arguments: [matchingRoutes, document.uri, sourcePosition],
           }),
         )
@@ -77,9 +85,7 @@ export class TestClientCodeLensProvider implements vscode.CodeLensProvider {
     return codeLenses
   }
 
-  private findTestClientCalls(
-    rootNode: import("web-tree-sitter").Node,
-  ): TestClientCall[] {
+  private findTestClientCalls(rootNode: Node): TestClientCall[] {
     const calls: TestClientCall[] = []
     const callNodes = findNodesByType(rootNode, "call")
 
@@ -115,17 +121,9 @@ export class TestClientCodeLensProvider implements vscode.CodeLensProvider {
 
       const pathArg = args[0]
       // Only handle string literals for now
-      if (pathArg.type !== "string") {
+      const path = extractStringValue(pathArg)
+      if (path === null) {
         continue
-      }
-
-      // Extract path string (remove quotes and f-string prefix)
-      let path = pathArg.text
-      // Remove f-string prefix if present: f"..." or f'...'
-      if (path.startsWith('f"') || path.startsWith("f'")) {
-        path = path.slice(2, -1)
-      } else {
-        path = path.slice(1, -1)
       }
 
       calls.push({
