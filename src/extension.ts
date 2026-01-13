@@ -73,15 +73,8 @@ async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
   return apps
 }
 
-function navigateToLocation(location: SourceLocation): void {
-  const uri = vscode.Uri.file(location.filePath)
-  const position = new vscode.Position(location.line - 1, location.column)
-  vscode.window.showTextDocument(uri, {
-    selection: new vscode.Range(position, position),
-  })
-}
-
 let parserService: Parser | null = null
+
 
 export async function activate(context: vscode.ExtensionContext) {
   parserService = new Parser()
@@ -114,6 +107,9 @@ export async function activate(context: vscode.ExtensionContext) {
       clearTimeout(refreshTimeout)
     }
     refreshTimeout = setTimeout(async () => {
+      if (!parserService) {
+        return
+      }
       const newApps = await discoverFastAPIApps(parserService)
       endpointProvider.setApps(newApps)
       codeLensProvider.setApps(newApps)
@@ -156,15 +152,6 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
 
     vscode.commands.registerCommand(
-      "fastapi-vscode.goToEndpoint",
-      (item: EndpointTreeItem) => {
-        if (item.type === "route") {
-          navigateToLocation(item.route.location)
-        }
-      },
-    ),
-
-    vscode.commands.registerCommand(
       "fastapi-vscode.copyEndpointPath",
       (item: EndpointTreeItem) => {
         if (item.type === "route") {
@@ -175,26 +162,18 @@ export async function activate(context: vscode.ExtensionContext) {
       },
     ),
 
-    vscode.commands.registerCommand(
-      "fastapi-vscode.goToRouter",
-      (item: EndpointTreeItem) => {
-        if (item.type === "router") {
-          navigateToLocation(item.router.location)
-        }
-      },
-    ),
-
     vscode.commands.registerCommand("fastapi-vscode.toggleRouters", () => {
       endpointProvider.toggleRouters()
     }),
 
     vscode.commands.registerCommand(
-      "fastapi-vscode.goToRoute",
+      "fastapi-vscode.goToLocation",
       async (
-        locations: SourceLocation[],
+        location: SourceLocation | SourceLocation[],
         sourceUri?: vscode.Uri,
         sourcePosition?: vscode.Position,
       ) => {
+        const locations = Array.isArray(location) ? location : [location]
         if (locations.length === 0) {
           return
         }
@@ -228,7 +207,7 @@ export async function activate(context: vscode.ExtensionContext) {
           fromPosition,
           locationLinks,
           locations.length === 1 ? "goto" : "peek",
-          "No matching path operations found",
+          "No matching route found",
         )
       },
     ),

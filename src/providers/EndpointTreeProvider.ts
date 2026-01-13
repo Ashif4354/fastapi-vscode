@@ -377,9 +377,9 @@ export class EndpointTreeProvider
           `${element.route.method} ${element.route.path}\n\nFunction: ${element.route.functionName}\nFile: ${element.route.location.filePath}:${element.route.location.line}`,
         )
         routeItem.command = {
-          command: "fastapi-vscode.goToEndpoint",
+          command: "fastapi-vscode.goToLocation",
           title: "Go to Definition",
-          arguments: [element],
+          arguments: [element.route.location],
         }
         return routeItem
       }

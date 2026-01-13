@@ -75,7 +75,7 @@ export class TestCodeLensProvider implements CodeLensProvider {
         codeLenses.push(
           new CodeLens(range, {
             title: `Go to route: ${methodUpper} ${displayPath}`,
-            command: "fastapi-vscode.goToRoute",
+            command: "fastapi-vscode.goToLocation",
             arguments: [matchingRoutes, document.uri, sourcePosition],
           }),
         )

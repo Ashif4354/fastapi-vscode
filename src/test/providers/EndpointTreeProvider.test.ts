@@ -145,7 +145,7 @@ suite("EndpointTreeProvider", () => {
       assert.ok(treeItem.command, "Route should have a command")
       assert.strictEqual(
         treeItem.command?.command,
-        "fastapi-vscode.goToEndpoint",
+        "fastapi-vscode.goToLocation",
       )
     }
   })
