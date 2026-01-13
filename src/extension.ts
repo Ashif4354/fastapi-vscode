@@ -15,6 +15,7 @@ import {
   type EndpointTreeItem,
   EndpointTreeProvider,
 } from "./providers/EndpointTreeProvider"
+import { TestClientCodeLensProvider } from "./providers/TestClientCodeLensProvider"
 
 async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
   const apps: AppDefinition[] = []
@@ -105,6 +106,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   let refreshTimeout: NodeJS.Timeout | null = null
 
+  // Register CodeLens provider for test files
+  const codeLensProvider = new TestClientCodeLensProvider(parserService, apps)
+
   const triggerRefresh = () => {
     if (refreshTimeout) {
       clearTimeout(refreshTimeout)
@@ -112,6 +116,7 @@ export async function activate(context: vscode.ExtensionContext) {
     refreshTimeout = setTimeout(async () => {
       const newApps = await discoverFastAPIApps(parserService)
       endpointProvider.setApps(newApps)
+      codeLensProvider.setApps(newApps)
     }, 500) // Debounce for 500ms
   }
 
@@ -126,9 +131,23 @@ export async function activate(context: vscode.ExtensionContext) {
     treeDataProvider: endpointProvider,
   })
 
-  context.subscriptions.push(
-    treeView,
+  const config = vscode.workspace.getConfiguration("fastapi")
+  const codeLensEnabled = config.get<boolean>("testCodeLenses", true)
 
+  let codeLensDisposable: vscode.Disposable | undefined
+  if (codeLensEnabled) {
+    codeLensDisposable = vscode.languages.registerCodeLensProvider(
+      { language: "python", pattern: "**/test*.py" },
+      codeLensProvider,
+    )
+  }
+
+  context.subscriptions.push(treeView)
+  if (codeLensDisposable) {
+    context.subscriptions.push(codeLensDisposable)
+  }
+
+  context.subscriptions.push(
     vscode.commands.registerCommand(
       "fastapi-vscode.refreshEndpoints",
       async () => {
@@ -173,6 +192,51 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("fastapi-vscode.toggleRouters", () => {
       endpointProvider.toggleRouters()
     }),
+
+    vscode.commands.registerCommand(
+      "fastapi-vscode.goToPathOperation",
+      async (
+        locations: SourceLocation[],
+        sourceUri?: vscode.Uri,
+        sourcePosition?: vscode.Position,
+      ) => {
+        if (locations.length === 0) {
+          return
+        }
+
+        // Use passed source location or fall back to active editor
+        let fromUri = sourceUri
+        let fromPosition = sourcePosition
+        if (!fromUri || !fromPosition) {
+          const editor = vscode.window.activeTextEditor
+          if (!editor) {
+            return
+          }
+          fromUri = editor.document.uri
+          fromPosition = editor.selection.active
+        }
+
+        const locationLinks: vscode.Location[] = locations.map((loc) => {
+          const targetUri = vscode.Uri.file(loc.filePath)
+          const targetPos = new vscode.Position(loc.line - 1, loc.column)
+          return new vscode.Location(
+            targetUri,
+            new vscode.Range(targetPos, targetPos),
+          )
+        })
+
+        // Use goToLocations for both single and multiple matches
+        // This properly records navigation history for "go back"
+        await vscode.commands.executeCommand(
+          "editor.action.goToLocations",
+          fromUri,
+          fromPosition,
+          locationLinks,
+          locations.length === 1 ? "goto" : "peek",
+          "No matching path operations found",
+        )
+      },
+    ),
   )
 }
 

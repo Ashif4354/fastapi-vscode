@@ -8,12 +8,14 @@ A VS Code extension for FastAPI development that discovers and displays your API
 - Tree view showing all endpoints organized by router
 - Click to navigate to route definitions
 - Supports `include_router` chains with prefix resolution
+- CodeLens in test files to jump from test client calls to route definitions
 
 ## Settings
 
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `fastapi.entryPoint` | Path to the main FastAPI application file (e.g., `src/main.py`). If not set, the extension searches common locations: `main.py`, `app/main.py`, `api/main.py`, `src/main.py`, `backend/app/main.py`. | `""` (auto-detect) |
+| `fastapi.testCodeLenses` | Show CodeLens links above test client calls (e.g., `client.get('/items')`) to navigate to the corresponding route definition. | `true` |
 
 **Note:** Currently the extension discovers one FastAPI app per workspace folder. If you have multiple apps, use separate workspace folders or configure `fastapi.entryPoint` to point to your primary app.
 
