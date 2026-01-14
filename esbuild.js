@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, globSync, mkdirSync } from "node:fs"
+import { copyFileSync, globSync, mkdirSync } from "node:fs"
 import path from "node:path"
 import esbuild from "esbuild"
 
@@ -7,32 +7,18 @@ const watch = process.argv.includes("--watch")
 
 function copyWasmFiles() {
   const wasmDestDir = path.join(import.meta.dirname, "dist", "wasm")
+  mkdirSync(wasmDestDir, { recursive: true })
 
-  if (!existsSync(wasmDestDir)) {
-    mkdirSync(wasmDestDir, { recursive: true })
+  const wasmFiles = [
+    ["web-tree-sitter", "web-tree-sitter.wasm"],
+    ["tree-sitter-python", "tree-sitter-python.wasm"],
+  ]
+
+  for (const [pkg, file] of wasmFiles) {
+    const src = path.join(import.meta.dirname, "node_modules", pkg, file)
+    copyFileSync(src, path.join(wasmDestDir, file))
+    console.log(`Copied ${file} -> dist/wasm/`)
   }
-
-  // Copy core tree-sitter wasm from web-tree-sitter (keep original name)
-  const coreWasmSrc = path.join(
-    import.meta.dirname,
-    "node_modules",
-    "web-tree-sitter",
-    "web-tree-sitter.wasm",
-  )
-  const coreWasmDest = path.join(wasmDestDir, "web-tree-sitter.wasm")
-  copyFileSync(coreWasmSrc, coreWasmDest)
-  console.log("Copied web-tree-sitter.wasm -> dist/wasm/")
-
-  // Copy Python grammar wasm from tree-sitter-python
-  const pythonWasmSrc = path.join(
-    import.meta.dirname,
-    "node_modules",
-    "tree-sitter-python",
-    "tree-sitter-python.wasm",
-  )
-  const pythonWasmDest = path.join(wasmDestDir, "tree-sitter-python.wasm")
-  copyFileSync(pythonWasmSrc, pythonWasmDest)
-  console.log("Copied tree-sitter-python.wasm -> dist/wasm/")
 }
 
 async function main() {
