@@ -1,12 +1,20 @@
-.vscode/**
-.vscode-test/**
+# Source files (bundled into dist/)
 src/**
-.gitignore
-.yarnrc
-**/*.map
-**/*.ts
-**/tsconfig.json
 esbuild.js
-bun.lockb
+wasm/**
+
+# Dependencies
 node_modules/**
-!node_modules/web-tree-sitter/**
+!node_modules/web-tree-sitter/package.json
+!node_modules/web-tree-sitter/web-tree-sitter.cjs
+
+# Build artifacts
+dist/test/**
+dist/*.map
+
+# Config/meta files
+.*/
+.*
+*.lock*
+*.json
+!package.json

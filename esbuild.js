@@ -9,16 +9,24 @@ function copyWasmFiles() {
   const wasmDestDir = path.join(import.meta.dirname, "dist", "wasm")
   mkdirSync(wasmDestDir, { recursive: true })
 
-  const wasmFiles = [
-    ["web-tree-sitter", "web-tree-sitter.wasm"],
-    ["tree-sitter-python", "tree-sitter-python.wasm"],
-  ]
+  // web-tree-sitter.wasm from node_modules
+  const coreSrc = path.join(
+    import.meta.dirname,
+    "node_modules",
+    "web-tree-sitter",
+    "web-tree-sitter.wasm",
+  )
+  copyFileSync(coreSrc, path.join(wasmDestDir, "web-tree-sitter.wasm"))
+  console.log("Copied web-tree-sitter.wasm -> dist/wasm/")
 
-  for (const [pkg, file] of wasmFiles) {
-    const src = path.join(import.meta.dirname, "node_modules", pkg, file)
-    copyFileSync(src, path.join(wasmDestDir, file))
-    console.log(`Copied ${file} -> dist/wasm/`)
-  }
+  // tree-sitter-python.wasm from wasm/ directory (checked into repo)
+  const pythonSrc = path.join(
+    import.meta.dirname,
+    "wasm",
+    "tree-sitter-python.wasm",
+  )
+  copyFileSync(pythonSrc, path.join(wasmDestDir, "tree-sitter-python.wasm"))
+  console.log("Copied tree-sitter-python.wasm -> dist/wasm/")
 }
 
 async function main() {
