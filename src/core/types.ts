@@ -1,3 +1,7 @@
+/**
+ * Public API types for FastAPI endpoint discovery.
+ */
+
 export type HTTPMethod =
   | "GET"
   | "POST"
@@ -25,8 +29,10 @@ export interface RouteDefinition {
 export interface RouterDefinition {
   name: string
   prefix: string
+  tags: string[]
   location: SourceLocation
   routes: RouteDefinition[]
+  children: RouterDefinition[] // Nested routers (by prefix hierarchy)
 }
 
 export interface AppDefinition {
@@ -36,9 +42,3 @@ export interface AppDefinition {
   routers: RouterDefinition[]
   routes: RouteDefinition[] // Direct routes on the app
 }
-
-export type EndpointTreeItem =
-  | { type: "workspace"; label: string; apps: AppDefinition[] }
-  | { type: "app"; app: AppDefinition }
-  | { type: "router"; router: RouterDefinition }
-  | { type: "route"; route: RouteDefinition }

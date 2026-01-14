@@ -1,9 +1,20 @@
+# Source files (bundled into dist/)
 src/**
+esbuild.js
+wasm/**
+
+# Dependencies
 node_modules/**
+!node_modules/web-tree-sitter/package.json
+!node_modules/web-tree-sitter/web-tree-sitter.cjs
+
+# Build artifacts
 dist/test/**
+dist/*.map
+
+# Config/meta files
 .*/
 .*
 *.lock*
 *.json
 !package.json
-esbuild.js

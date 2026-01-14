@@ -1,17 +1,78 @@
+/**
+ * VSCode extension entry point for FastAPI endpoint discovery.
+ */
+
+import { existsSync } from "node:fs"
+import { sep } from "node:path"
 import * as vscode from "vscode"
-import { EndpointTreeProvider } from "./providers/EndpointTreeProvider"
-// TODO: Replace with real endpoint discovery service
+import { clearImportCache } from "./core/importResolver"
+import { Parser } from "./core/parser"
+import { findProjectRoot, stripLeadingDynamicSegments } from "./core/pathUtils"
+import { buildRouterGraph } from "./core/routerResolver"
+import { routerNodeToAppDefinition } from "./core/transformer"
+import type { AppDefinition, SourceLocation } from "./core/types"
 import {
-  groupAppsByWorkspace,
-  mockApps,
-} from "./test/fixtures/mockEndpointData"
-import type { EndpointTreeItem, SourceLocation } from "./types/endpoint"
+  type EndpointTreeItem,
+  EndpointTreeProvider,
+} from "./providers/EndpointTreeProvider"
+
+async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
+  const apps: AppDefinition[] = []
+  const workspaceFolders = vscode.workspace.workspaceFolders
+
+  if (!workspaceFolders) {
+    return apps
+  }
+
+  for (const folder of workspaceFolders) {
+    const config = vscode.workspace.getConfiguration("fastapi", folder.uri)
+    const customEntryPoint = config.get<string>("entryPoint")
+
+    let candidates: string[] = []
+
+    if (customEntryPoint) {
+      // Use custom entry point if specified
+      const entryPath = customEntryPoint.startsWith("/")
+        ? customEntryPoint
+        : vscode.Uri.joinPath(folder.uri, customEntryPoint).fsPath
+
+      if (!existsSync(entryPath)) {
+        vscode.window.showWarningMessage(
+          `FastAPI entry point not found: ${customEntryPoint}`,
+        )
+        continue
+      }
+
+      candidates = [entryPath]
+    } else {
+      // Scan for main.py and __init__.py files (likely FastAPI entry points)
+      const mainFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, "**/main.py"),
+      )
+      const initFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, "**/__init__.py"),
+      )
+      // Prefer main.py, then __init__.py, sorted by path depth (shallower first)
+      candidates = [...mainFiles, ...initFiles]
+        .map((uri) => uri.fsPath)
+        .sort((a, b) => a.split(sep).length - b.split(sep).length)
+    }
+
+    for (const entryPath of candidates) {
+      const projectRoot = findProjectRoot(entryPath, folder.uri.fsPath)
+      const routerNode = buildRouterGraph(entryPath, parser, projectRoot)
+
+      if (routerNode) {
+        apps.push(routerNodeToAppDefinition(routerNode, folder.uri.fsPath))
+        break
+      }
+    }
+  }
+
+  return apps
+}
 
 function navigateToLocation(location: SourceLocation): void {
-  if (!location.filePath) {
-    vscode.window.showErrorMessage("File path is missing for the endpoint.")
-    return
-  }
   const uri = vscode.Uri.file(location.filePath)
   const position = new vscode.Position(location.line - 1, location.column)
   vscode.window.showTextDocument(uri, {
@@ -19,22 +80,47 @@ function navigateToLocation(location: SourceLocation): void {
   })
 }
 
-// This method is called when your extension is activated
-export function activate(context: vscode.ExtensionContext) {
-  const endpointProvider = new EndpointTreeProvider(
-    mockApps,
-    groupAppsByWorkspace,
-  )
+let parserService: Parser | null = null
+
+export async function activate(context: vscode.ExtensionContext) {
+  parserService = new Parser()
+  await parserService.init({
+    core: vscode.Uri.joinPath(
+      context.extensionUri,
+      "dist",
+      "wasm",
+      "web-tree-sitter.wasm",
+    ).fsPath,
+    python: vscode.Uri.joinPath(
+      context.extensionUri,
+      "dist",
+      "wasm",
+      "tree-sitter-python.wasm",
+    ).fsPath,
+  })
+
+  // Discover FastAPI endpoints from workspace
+  const apps = await discoverFastAPIApps(parserService)
+  const endpointProvider = new EndpointTreeProvider(apps)
+
+  const treeView = vscode.window.createTreeView("endpoint-explorer", {
+    treeDataProvider: endpointProvider,
+  })
 
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider(
-      "endpoint-explorer",
-      endpointProvider,
-    ),
+    treeView,
 
-    vscode.commands.registerCommand("fastapi-vscode.refreshEndpoints", () => {
-      endpointProvider.refresh()
-    }),
+    vscode.commands.registerCommand(
+      "fastapi-vscode.refreshEndpoints",
+      async () => {
+        if (!parserService) {
+          return
+        }
+        clearImportCache()
+        const newApps = await discoverFastAPIApps(parserService)
+        endpointProvider.setApps(newApps)
+      },
+    ),
 
     vscode.commands.registerCommand(
       "fastapi-vscode.goToEndpoint",
@@ -49,8 +135,9 @@ export function activate(context: vscode.ExtensionContext) {
       "fastapi-vscode.copyEndpointPath",
       (item: EndpointTreeItem) => {
         if (item.type === "route") {
-          vscode.env.clipboard.writeText(item.route.path)
-          vscode.window.showInformationMessage(`Copied: ${item.route.path}`)
+          vscode.env.clipboard.writeText(
+            stripLeadingDynamicSegments(item.route.path),
+          )
         }
       },
     ),
@@ -64,16 +151,6 @@ export function activate(context: vscode.ExtensionContext) {
       },
     ),
 
-    vscode.commands.registerCommand(
-      "fastapi-vscode.copyRouterPrefix",
-      (item: EndpointTreeItem) => {
-        if (item.type === "router") {
-          vscode.env.clipboard.writeText(item.router.prefix)
-          vscode.window.showInformationMessage(`Copied: ${item.router.prefix}`)
-        }
-      },
-    ),
-
     vscode.commands.registerCommand("fastapi-vscode.reportIssue", () => {
       vscode.env.openExternal(
         vscode.Uri.parse(
@@ -81,7 +158,15 @@ export function activate(context: vscode.ExtensionContext) {
         ),
       )
     }),
+
+    vscode.commands.registerCommand("fastapi-vscode.toggleRouters", () => {
+      endpointProvider.toggleRouters()
+    }),
   )
 }
 
-export function deactivate() {}
+export function deactivate() {
+  parserService?.dispose()
+  parserService = null
+  clearImportCache()
+}

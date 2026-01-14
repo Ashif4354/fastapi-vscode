@@ -2,40 +2,50 @@
   "name": "fastapi-vscode",
   "displayName": "FastAPI Extension",
   "description": "VS Code extension for FastAPI development",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "FastAPILabs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fastapi/fastapi-vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/fastapi/fastapi-vscode/issues"
+  },
+  "homepage": "https://github.com/fastapi/fastapi-vscode#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": [
-    "Other"
-  ],
+  "main": "./dist/extension.js",
   "activationEvents": [
     "workspaceContains:**/*.py"
   ],
-  "main": "./dist/extension.js",
+  "categories": [
+    "Other"
+  ],
   "contributes": {
     "commands": [
       {
         "command": "fastapi-vscode.refreshEndpoints",
         "title": "Refresh Endpoints",
+        "category": "FastAPI",
         "icon": "$(refresh)"
       },
       {
-        "command": "fastapi-vscode.goToEndpoint",
-        "title": "Go to Definition"
+        "command": "fastapi-vscode.toggleRouters",
+        "title": "Toggle Expand/Collapse Routers",
+        "category": "FastAPI",
+        "icon": "$(fold)"
       },
       {
         "command": "fastapi-vscode.copyEndpointPath",
-        "title": "Copy Path"
+        "title": "Copy Endpoint Path",
+        "category": "FastAPI"
       },
       {
         "command": "fastapi-vscode.goToRouter",
-        "title": "Go to Router Definition"
-      },
-      {
-        "command": "fastapi-vscode.copyRouterPrefix",
-        "title": "Copy Prefix"
+        "title": "Go to Router Definition",
+        "category": "FastAPI"
       },
       {
         "command": "fastapi-vscode.reportIssue",
@@ -44,19 +54,29 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "fastapi-vscode.copyEndpointPath",
+          "when": "false"
+        },
+        {
+          "command": "fastapi-vscode.goToRouter",
+          "when": "false"
+        }
+      ],
       "view/title": [
         {
           "command": "fastapi-vscode.refreshEndpoints",
           "when": "view == endpoint-explorer",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "fastapi-vscode.toggleRouters",
+          "when": "view == endpoint-explorer",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
-        {
-          "command": "fastapi-vscode.goToEndpoint",
-          "when": "view == endpoint-explorer && viewItem == route",
-          "group": "navigation"
-        },
         {
           "command": "fastapi-vscode.copyEndpointPath",
           "when": "view == endpoint-explorer && viewItem == route",
@@ -64,11 +84,6 @@
         },
         {
           "command": "fastapi-vscode.goToRouter",
-          "when": "view == endpoint-explorer && viewItem == router",
-          "group": "navigation"
-        },
-        {
-          "command": "fastapi-vscode.copyRouterPrefix",
           "when": "view == endpoint-explorer && viewItem == router",
           "group": "navigation"
         }
@@ -90,6 +105,16 @@
           "name": "Endpoint Explorer"
         }
       ]
+    },
+    "configuration": {
+      "title": "FastAPI",
+      "properties": {
+        "fastapi.entryPoint": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the main FastAPI application file (e.g., 'src/main.py'). If not set, the extension will search common locations."
+        }
+      }
     }
   },
   "scripts": {
@@ -115,15 +140,9 @@
     "lint-staged": "^16.2.7",
     "typescript": "^5.0.0"
   },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/fastapi/fastapi-vscode"
+  "dependencies": {
+    "web-tree-sitter": "^0.26.3"
   },
-  "bugs": {
-    "url": "https://github.com/fastapi/fastapi-vscode/issues"
-  },
-  "homepage": "https://github.com/fastapi/fastapi-vscode#readme",
   "lint-staged": {
     "*.{ts,js,json}": [
       "biome check --write"

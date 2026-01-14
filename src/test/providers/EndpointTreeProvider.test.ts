@@ -1,6 +1,6 @@
 import * as assert from "node:assert"
-import { EndpointTreeProvider } from "../providers/EndpointTreeProvider"
-import { mockApps } from "./fixtures/mockEndpointData"
+import { EndpointTreeProvider } from "../../providers/EndpointTreeProvider"
+import { mockApps } from "../fixtures/mockEndpointData"
 
 suite("EndpointTreeProvider", () => {
   let provider: EndpointTreeProvider
@@ -176,10 +176,14 @@ suite("EndpointTreeProvider", () => {
     }
   })
 
-  test("getChildren returns empty array when no apps", () => {
+  test("getChildren returns message when no apps", () => {
     const emptyProvider = new EndpointTreeProvider([])
     const roots = emptyProvider.getChildren()
-    assert.strictEqual(roots.length, 0, "Should return empty array")
+    assert.strictEqual(roots.length, 1, "Should return one message item")
+    assert.strictEqual(roots[0].type, "message")
+    if (roots[0].type === "message") {
+      assert.strictEqual(roots[0].text, "No FastAPI app found")
+    }
   })
 
   test("getTreeItem sets contextValue for app", () => {

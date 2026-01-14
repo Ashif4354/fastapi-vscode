@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "fastapi-vscode",
+      "dependencies": {
+        "web-tree-sitter": "^0.26.3",
+      },
       "devDependencies": {
         "@biomejs/biome": "^2.3.11",
         "@types/bun": "latest",
@@ -15,9 +18,7 @@
         "esbuild": "^0.27.2",
         "husky": "^9.1.7",
         "lint-staged": "^16.2.7",
-      },
-      "peerDependencies": {
-        "typescript": "^5",
+        "typescript": "^5.0.0",
       },
     },
   },
@@ -831,6 +832,8 @@
     "validate-npm-package-license": ["validate-npm-package-license@3.0.4", "", { "dependencies": { "spdx-correct": "^3.0.0", "spdx-expression-parse": "^3.0.0" } }, "sha512-DpKm2Ui/xN7/HQKCtpZxoRWBhZ9Z0kqtygG8XCgNQ8ZlDnxuQmWhj566j8fN4Cu3/JmbhsDo7fcAJq4s9h27Ew=="],
 
     "version-range": ["version-range@4.15.0", "", {}, "sha512-Ck0EJbAGxHwprkzFO966t4/5QkRuzh+/I1RxhLgUKKwEn+Cd8NwM60mE3AqBZg5gYODoXW0EFsQvbZjRlvdqbg=="],
+
+    "web-tree-sitter": ["web-tree-sitter@0.26.3", "", {}, "sha512-JIVgIKFS1w6lejxSntCtsS/QsE/ecTS00en809cMxMPxaor6MvUnQ+ovG8uTTTvQCFosSh4MeDdI5bSGw5SoBw=="],
 
     "whatwg-encoding": ["whatwg-encoding@3.1.1", "", { "dependencies": { "iconv-lite": "0.6.3" } }, "sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ=="],
 
