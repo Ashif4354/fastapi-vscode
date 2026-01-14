@@ -9,7 +9,7 @@ import {
 } from "../core/pathUtils"
 
 const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures", "python")
+  return path.join(__dirname, "..", "..", "src", "test", "fixtures", "standard")
 }
 
 suite("pathUtils", () => {
@@ -144,7 +144,7 @@ suite("pathUtils", () => {
     })
 
     test("returns entry dir when no __init__.py present", () => {
-      // main.py is at fixtures/python/main.py, and fixtures/python has no __init__.py
+      // main.py is at fixtures/standard/main.py, and fixtures/standard has no __init__.py
       const mainPyPath = path.join(fixturesPath, "main.py")
       const result = findProjectRoot(mainPyPath, fixturesPath)
 
@@ -152,34 +152,22 @@ suite("pathUtils", () => {
     })
 
     test("walks up to find project root from nested package", () => {
-      // users.py is in app/api/routes/users.py
-      // app has __init__.py, api has __init__.py, routes has __init__.py
-      // but fixtures/python does not, so project root should be fixtures/python
-      const usersPath = path.join(
-        fixturesPath,
-        "app",
-        "api",
-        "routes",
-        "users.py",
-      )
+      // users.py is in app/routes/users.py
+      // app has __init__.py, routes has __init__.py
+      // but fixtures/standard does not, so project root should be fixtures/standard
+      const usersPath = path.join(fixturesPath, "app", "routes", "users.py")
       const result = findProjectRoot(usersPath, fixturesPath)
 
       assert.strictEqual(result, fixturesPath)
     })
 
     test("returns workspace root when all dirs have __init__.py", () => {
-      // If we pretend the workspace root is app/api, it should return that
-      const usersPath = path.join(
-        fixturesPath,
-        "app",
-        "api",
-        "routes",
-        "users.py",
-      )
-      const apiRoot = path.join(fixturesPath, "app", "api")
-      const result = findProjectRoot(usersPath, apiRoot)
+      // If we pretend the workspace root is app, it should return that
+      const usersPath = path.join(fixturesPath, "app", "routes", "users.py")
+      const appRoot = path.join(fixturesPath, "app")
+      const result = findProjectRoot(usersPath, appRoot)
 
-      assert.strictEqual(result, apiRoot)
+      assert.strictEqual(result, appRoot)
     })
   })
 })

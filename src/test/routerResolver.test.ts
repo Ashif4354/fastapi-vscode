@@ -12,9 +12,8 @@ const getWasmPaths = () => {
   }
 }
 
-// Fixtures are in src/test/fixtures/python
 const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures", "python")
+  return path.join(__dirname, "..", "..", "src", "test", "fixtures")
 }
 
 suite("routerResolver", () => {
@@ -33,8 +32,9 @@ suite("routerResolver", () => {
 
   suite("buildRouterGraph", () => {
     test("builds graph from main.py entry point", () => {
-      const mainPyPath = path.join(fixturesPath, "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      const standardPath = path.join(fixturesPath, "standard")
+      const mainPyPath = path.join(standardPath, "app", "main.py")
+      const result = buildRouterGraph(mainPyPath, parser, standardPath)
 
       assert.ok(result)
       assert.strictEqual(result.type, "FastAPI")
@@ -43,34 +43,42 @@ suite("routerResolver", () => {
     })
 
     test("includes direct routes on app", () => {
-      const mainPyPath = path.join(fixturesPath, "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      const standardPath = path.join(fixturesPath, "standard")
+      const mainPyPath = path.join(standardPath, "app", "main.py")
+      const result = buildRouterGraph(mainPyPath, parser, standardPath)
 
       assert.ok(result)
-      // main.py has @app.get("/health")
+      // app/main.py has @app.get("/health")
       const healthRoute = result.routes.find((r) => r.path === "/health")
       assert.ok(healthRoute)
       assert.strictEqual(healthRoute.method, "get")
-      assert.strictEqual(healthRoute.function, "health_check")
+      assert.strictEqual(healthRoute.function, "health")
     })
 
     test("follows include_router to child routers", () => {
-      const mainPyPath = path.join(fixturesPath, "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, fixturesPath)
+      const standardPath = path.join(fixturesPath, "standard")
+      const mainPyPath = path.join(standardPath, "app", "main.py")
+      const result = buildRouterGraph(mainPyPath, parser, standardPath)
 
       assert.ok(result)
-      // main.py includes api_router from app.api.main
-      assert.ok(result.children.length > 0)
+      // app/main.py includes users and items routers
+      assert.ok(
+        result.children.length >= 2,
+        "Should have at least 2 child routers",
+      )
     })
 
-    test("captures prefix from include_router", () => {
-      const mainPyPath = path.join(fixturesPath, "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, fixturesPath)
+    test("captures prefix from router definition", () => {
+      const standardPath = path.join(fixturesPath, "standard")
+      const mainPyPath = path.join(standardPath, "app", "main.py")
+      const result = buildRouterGraph(mainPyPath, parser, standardPath)
 
       assert.ok(result)
-      // app.include_router(api_router, prefix="/api/v1")
-      const apiChild = result.children.find((c) => c.prefix === "/api/v1")
-      assert.ok(apiChild, "Should have child with /api/v1 prefix")
+      // users.router has prefix="/users" in its definition
+      const usersChild = result.children.find(
+        (c) => c.router.prefix === "/users",
+      )
+      assert.ok(usersChild, "Should have child with /users prefix")
     })
 
     test("returns null for non-existent file", () => {
@@ -83,40 +91,31 @@ suite("routerResolver", () => {
     })
 
     test("returns null for file without FastAPI/APIRouter", () => {
-      const initPath = path.join(fixturesPath, "app", "__init__.py")
-      const result = buildRouterGraph(initPath, parser, fixturesPath)
+      const standardPath = path.join(fixturesPath, "standard")
+      const initPath = path.join(standardPath, "app", "__init__.py")
+      const result = buildRouterGraph(initPath, parser, standardPath)
 
       // __init__.py has no FastAPI or APIRouter
       assert.strictEqual(result, null)
     })
 
     test("builds graph from APIRouter file", () => {
-      const usersPath = path.join(
-        fixturesPath,
-        "app",
-        "api",
-        "routes",
-        "users.py",
-      )
-      const result = buildRouterGraph(usersPath, parser, fixturesPath)
+      const standardPath = path.join(fixturesPath, "standard")
+      const usersPath = path.join(standardPath, "app", "routes", "users.py")
+      const result = buildRouterGraph(usersPath, parser, standardPath)
 
       assert.ok(result)
       assert.strictEqual(result.type, "APIRouter")
       assert.strictEqual(result.variableName, "router")
 
-      // Should have routes
-      assert.ok(result.routes.length >= 5)
+      // Should have routes (users.py has 3 routes: list, get, create)
+      assert.ok(result.routes.length >= 3)
     })
 
     test("includes line numbers for routes", () => {
-      const usersPath = path.join(
-        fixturesPath,
-        "app",
-        "api",
-        "routes",
-        "users.py",
-      )
-      const result = buildRouterGraph(usersPath, parser, fixturesPath)
+      const standardPath = path.join(fixturesPath, "standard")
+      const usersPath = path.join(standardPath, "app", "routes", "users.py")
+      const result = buildRouterGraph(usersPath, parser, standardPath)
 
       assert.ok(result)
       for (const route of result.routes) {
@@ -126,14 +125,9 @@ suite("routerResolver", () => {
     })
 
     test("includes router location info", () => {
-      const usersPath = path.join(
-        fixturesPath,
-        "app",
-        "api",
-        "routes",
-        "users.py",
-      )
-      const result = buildRouterGraph(usersPath, parser, fixturesPath)
+      const standardPath = path.join(fixturesPath, "standard")
+      const usersPath = path.join(standardPath, "app", "routes", "users.py")
+      const result = buildRouterGraph(usersPath, parser, standardPath)
 
       assert.ok(result)
       assert.strictEqual(result.filePath, usersPath)
@@ -142,16 +136,15 @@ suite("routerResolver", () => {
     })
 
     test("follows __init__.py re-exports to actual router file", () => {
-      // integrations/__init__.py re-exports router from router.py
+      // Use reexport fixture which has integrations/__init__.py re-exporting from router.py
+      const reexportPath = path.join(fixturesPath, "reexport")
       const initPath = path.join(
-        fixturesPath,
+        reexportPath,
         "app",
-        "api",
-        "routes",
         "integrations",
         "__init__.py",
       )
-      const result = buildRouterGraph(initPath, parser, fixturesPath)
+      const result = buildRouterGraph(initPath, parser, reexportPath)
 
       assert.ok(result, "Should find router via re-export")
       assert.strictEqual(result.type, "APIRouter")
@@ -163,35 +156,32 @@ suite("routerResolver", () => {
         `Expected filePath to end with router.py, got ${result.filePath}`,
       )
 
-      // Should have the routes defined in router.py
+      // Should have the routes defined in router.py (3 routes: github, slack, webhook)
       assert.ok(result.routes.length >= 3, "Should have routes from router.py")
-      const neonRoute = result.routes.find((r) => r.path === "/neon/status")
-      assert.ok(neonRoute, "Should find neon route")
+      const githubRoute = result.routes.find((r) => r.path === "/github")
+      assert.ok(githubRoute, "Should find github route")
     })
 
-    test("includes integrations router when following include_router chain", () => {
-      const mainPyPath = path.join(fixturesPath, "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, fixturesPath)
+    test("includes router when following include_router chain", () => {
+      const standardPath = path.join(fixturesPath, "standard")
+      const mainPyPath = path.join(standardPath, "app", "main.py")
+      const result = buildRouterGraph(mainPyPath, parser, standardPath)
 
       assert.ok(result)
 
-      // Find the api_router child
-      const apiChild = result.children.find((c) => c.prefix === "/api/v1")
-      assert.ok(apiChild, "Should have api_router child")
+      // app/main.py includes users.router and items.router
+      assert.ok(result.children.length >= 2, "Should have child routers")
 
-      // The api_router should include integrations router
-      const integrationsChild = apiChild.router.children.find(
-        (c) => c.prefix === "/integrations",
+      // Find the users router child
+      const usersChild = result.children.find(
+        (c) => c.router.prefix === "/users",
       )
-      assert.ok(
-        integrationsChild,
-        "api_router should include integrations router",
-      )
+      assert.ok(usersChild, "Should have users router child")
 
-      // integrations router should have routes
+      // users router should have routes
       assert.ok(
-        integrationsChild.router.routes.length >= 3,
-        "integrations router should have routes",
+        usersChild.router.routes.length >= 3,
+        "users router should have routes",
       )
     })
   })

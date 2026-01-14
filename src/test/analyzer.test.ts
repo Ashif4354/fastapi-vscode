@@ -12,9 +12,9 @@ const getWasmPaths = () => {
   }
 }
 
-// Fixtures are in src/test/fixtures/python
+// Fixtures are in src/test/fixtures
 const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures", "python")
+  return path.join(__dirname, "..", "..", "src", "test", "fixtures")
 }
 
 suite("analyzer", () => {
@@ -130,7 +130,8 @@ import os
 
   suite("analyzeFile", () => {
     test("analyzes main.py fixture", () => {
-      const mainPyPath = path.join(fixturesPath, "main.py")
+      const standardPath = path.join(fixturesPath, "standard")
+      const mainPyPath = path.join(standardPath, "app", "main.py")
       const result = analyzeFile(mainPyPath, parser)
 
       assert.ok(result)
@@ -141,7 +142,7 @@ import os
       assert.ok(fastApiRouter)
       assert.strictEqual(fastApiRouter.variableName, "app")
 
-      // Should find include_router call
+      // Should find include_router calls
       assert.ok(result.includeRouters.length > 0)
 
       // Should find health check route
@@ -151,13 +152,8 @@ import os
     })
 
     test("analyzes users.py fixture", () => {
-      const usersPath = path.join(
-        fixturesPath,
-        "app",
-        "api",
-        "routes",
-        "users.py",
-      )
+      const standardPath = path.join(fixturesPath, "standard")
+      const usersPath = path.join(standardPath, "app", "routes", "users.py")
       const result = analyzeFile(usersPath, parser)
 
       assert.ok(result)
@@ -166,15 +162,13 @@ import os
       const apiRouter = result.routers.find((r) => r.type === "APIRouter")
       assert.ok(apiRouter)
 
-      // Should find multiple routes
-      assert.ok(result.routes.length >= 5)
+      // Should find routes (users.py has 3 routes: list, get, create)
+      assert.ok(result.routes.length >= 3)
 
-      // Check specific routes
+      // Check specific routes exist
       const methods = result.routes.map((r) => r.method)
       assert.ok(methods.includes("get"))
       assert.ok(methods.includes("post"))
-      assert.ok(methods.includes("put"))
-      assert.ok(methods.includes("delete"))
     })
 
     test("returns null for non-existent file", () => {
