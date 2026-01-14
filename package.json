@@ -3,7 +3,7 @@
   "displayName": "FastAPI Extension",
   "description": "VS Code extension for FastAPI development",
   "version": "0.0.1",
-  "publisher": "FastAPI Labs",
+  "publisher": "FastAPILabs",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -107,10 +107,8 @@
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "lint-staged": "^16.2.7",
+    "typescript": "^5.0.0"
   },
   "license": "MIT",
   "repository": {
