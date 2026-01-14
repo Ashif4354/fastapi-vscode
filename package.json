@@ -48,11 +48,6 @@
         "category": "FastAPI"
       },
       {
-        "command": "fastapi-vscode.copyRouterPrefix",
-        "title": "Copy Prefix",
-        "category": "FastAPI"
-      },
-      {
         "command": "fastapi-vscode.reportIssue",
         "title": "Report Issue...",
         "category": "FastAPI"
@@ -66,10 +61,6 @@
         },
         {
           "command": "fastapi-vscode.goToRouter",
-          "when": "false"
-        },
-        {
-          "command": "fastapi-vscode.copyRouterPrefix",
           "when": "false"
         }
       ],
@@ -93,11 +84,6 @@
         },
         {
           "command": "fastapi-vscode.goToRouter",
-          "when": "view == endpoint-explorer && viewItem == router",
-          "group": "navigation"
-        },
-        {
-          "command": "fastapi-vscode.copyRouterPrefix",
           "when": "view == endpoint-explorer && viewItem == router",
           "group": "navigation"
         }
