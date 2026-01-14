@@ -1,31 +1,15 @@
 import * as assert from "node:assert"
-import * as path from "node:path"
 import { Parser } from "../core/parser"
 import { buildRouterGraph } from "../core/routerResolver"
 import { routerNodeToAppDefinition } from "../core/transformer"
-
-// Tests run from dist/test/*.test.js, so we go up to dist, then into wasm
-const getWasmPaths = () => {
-  const wasmDir = path.join(__dirname, "..", "wasm")
-  return {
-    core: path.join(wasmDir, "web-tree-sitter.wasm"),
-    python: path.join(wasmDir, "tree-sitter-python.wasm"),
-  }
-}
-
-// Fixtures are in src/test/fixtures
-const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures")
-}
+import { fixtures, wasmPaths } from "./testUtils"
 
 suite("transformer", () => {
   let parser: Parser
-  let fixturesPath: string
 
   suiteSetup(async () => {
     parser = new Parser()
-    await parser.init(getWasmPaths())
-    fixturesPath = getFixturesPath()
+    await parser.init(wasmPaths)
   })
 
   suiteTeardown(() => {
@@ -34,23 +18,27 @@ suite("transformer", () => {
 
   suite("routerNodeToAppDefinition", () => {
     test("transforms router graph to AppDefinition", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const routerNode = buildRouterGraph(mainPyPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       const result = routerNodeToAppDefinition(routerNode, "/workspace")
 
       assert.ok(result)
       assert.strictEqual(result.name, "app")
-      assert.strictEqual(result.filePath, mainPyPath)
+      assert.strictEqual(result.filePath, fixtures.standard.mainPy)
       assert.strictEqual(result.workspaceFolder, "/workspace")
     })
 
     test("includes direct routes on app", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const routerNode = buildRouterGraph(mainPyPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       const result = routerNodeToAppDefinition(routerNode, "/workspace")
@@ -63,9 +51,11 @@ suite("transformer", () => {
     })
 
     test("flattens nested routers", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const routerNode = buildRouterGraph(mainPyPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       const result = routerNodeToAppDefinition(routerNode, "/workspace")
@@ -75,9 +65,11 @@ suite("transformer", () => {
     })
 
     test("computes full path with prefixes", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const routerNode = buildRouterGraph(mainPyPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       const result = routerNodeToAppDefinition(routerNode, "/workspace")
@@ -95,9 +87,11 @@ suite("transformer", () => {
     })
 
     test("normalizes HTTP methods to uppercase", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const routerNode = buildRouterGraph(mainPyPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       const result = routerNodeToAppDefinition(routerNode, "/workspace")
@@ -122,9 +116,11 @@ suite("transformer", () => {
     })
 
     test("includes location info for routes", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const routerNode = buildRouterGraph(mainPyPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       const result = routerNodeToAppDefinition(routerNode, "/workspace")
@@ -137,9 +133,11 @@ suite("transformer", () => {
     })
 
     test("includes location info for routers", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const routerNode = buildRouterGraph(mainPyPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       const result = routerNodeToAppDefinition(routerNode, "/workspace")
@@ -152,9 +150,11 @@ suite("transformer", () => {
     })
 
     test("includes tags from routers", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const usersPath = path.join(standardPath, "app", "routes", "users.py")
-      const routerNode = buildRouterGraph(usersPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.usersPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       // users.py has: router = APIRouter(prefix="/users", tags=["users"])
@@ -162,9 +162,11 @@ suite("transformer", () => {
     })
 
     test("skips routers with no routes or children", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const routerNode = buildRouterGraph(mainPyPath, parser, standardPath)
+      const routerNode = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
       assert.ok(routerNode)
 
       const result = routerNodeToAppDefinition(routerNode, "/workspace")

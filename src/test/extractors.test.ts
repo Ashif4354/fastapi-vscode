@@ -1,5 +1,4 @@
 import * as assert from "node:assert"
-import * as path from "node:path"
 import {
   decoratorExtractor,
   findNodesByType,
@@ -9,16 +8,7 @@ import {
   routerExtractor,
 } from "../core/extractors"
 import { Parser } from "../core/parser"
-
-// Get paths relative to this file's location when compiled
-// Tests run from dist/test/*.test.js, so we go up to dist, then into wasm
-const getWasmPaths = () => {
-  const wasmDir = path.join(__dirname, "..", "wasm")
-  return {
-    core: path.join(wasmDir, "web-tree-sitter.wasm"),
-    python: path.join(wasmDir, "tree-sitter-python.wasm"),
-  }
-}
+import { wasmPaths } from "./testUtils"
 
 suite("Extractors", () => {
   let parser: Parser
@@ -32,7 +22,7 @@ suite("Extractors", () => {
 
   suiteSetup(async () => {
     parser = new Parser()
-    await parser.init(getWasmPaths())
+    await parser.init(wasmPaths)
   })
 
   suiteTeardown(() => {

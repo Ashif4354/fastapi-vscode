@@ -1,5 +1,5 @@
 import * as assert from "node:assert"
-import * as path from "node:path"
+import { join } from "node:path"
 import {
   countSegments,
   findProjectRoot,
@@ -7,10 +7,9 @@ import {
   isWithinDirectory,
   stripLeadingDynamicSegments,
 } from "../core/pathUtils"
+import { fixtures } from "./testUtils"
 
-const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures", "standard")
-}
+const standardRoot = fixtures.standard.root
 
 suite("pathUtils", () => {
   suite("stripLeadingDynamicSegments", () => {
@@ -137,34 +136,28 @@ suite("pathUtils", () => {
   })
 
   suite("findProjectRoot", () => {
-    let fixturesPath: string
-
-    suiteSetup(() => {
-      fixturesPath = getFixturesPath()
-    })
-
     test("returns entry dir when no __init__.py present", () => {
       // main.py is at fixtures/standard/main.py, and fixtures/standard has no __init__.py
-      const mainPyPath = path.join(fixturesPath, "main.py")
-      const result = findProjectRoot(mainPyPath, fixturesPath)
+      const mainPyPath = join(standardRoot, "main.py")
+      const result = findProjectRoot(mainPyPath, standardRoot)
 
-      assert.strictEqual(result, fixturesPath)
+      assert.strictEqual(result, standardRoot)
     })
 
     test("walks up to find project root from nested package", () => {
       // users.py is in app/routes/users.py
       // app has __init__.py, routes has __init__.py
       // but fixtures/standard does not, so project root should be fixtures/standard
-      const usersPath = path.join(fixturesPath, "app", "routes", "users.py")
-      const result = findProjectRoot(usersPath, fixturesPath)
+      const usersPath = join(standardRoot, "app", "routes", "users.py")
+      const result = findProjectRoot(usersPath, standardRoot)
 
-      assert.strictEqual(result, fixturesPath)
+      assert.strictEqual(result, standardRoot)
     })
 
     test("returns workspace root when all dirs have __init__.py", () => {
       // If we pretend the workspace root is app, it should return that
-      const usersPath = path.join(fixturesPath, "app", "routes", "users.py")
-      const appRoot = path.join(fixturesPath, "app")
+      const usersPath = join(standardRoot, "app", "routes", "users.py")
+      const appRoot = join(standardRoot, "app")
       const result = findProjectRoot(usersPath, appRoot)
 
       assert.strictEqual(result, appRoot)

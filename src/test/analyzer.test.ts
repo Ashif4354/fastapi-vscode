@@ -1,25 +1,10 @@
 import * as assert from "node:assert"
-import * as path from "node:path"
 import { analyzeFile, analyzeTree } from "../core/analyzer"
 import { Parser } from "../core/parser"
-
-// Tests run from dist/test/*.test.js, so we go up to dist, then into wasm
-const getWasmPaths = () => {
-  const wasmDir = path.join(__dirname, "..", "wasm")
-  return {
-    core: path.join(wasmDir, "web-tree-sitter.wasm"),
-    python: path.join(wasmDir, "tree-sitter-python.wasm"),
-  }
-}
-
-// Fixtures are in src/test/fixtures
-const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures")
-}
+import { fixtures, wasmPaths } from "./testUtils"
 
 suite("analyzer", () => {
   let parser: Parser
-  let fixturesPath: string
 
   // Helper to parse code and assert tree is not null
   const parse = (code: string) => {
@@ -32,8 +17,7 @@ suite("analyzer", () => {
 
   suiteSetup(async () => {
     parser = new Parser()
-    await parser.init(getWasmPaths())
-    fixturesPath = getFixturesPath()
+    await parser.init(wasmPaths)
   })
 
   suiteTeardown(() => {
@@ -130,12 +114,10 @@ import os
 
   suite("analyzeFile", () => {
     test("analyzes main.py fixture", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const result = analyzeFile(mainPyPath, parser)
+      const result = analyzeFile(fixtures.standard.mainPy, parser)
 
       assert.ok(result)
-      assert.strictEqual(result.filePath, mainPyPath)
+      assert.strictEqual(result.filePath, fixtures.standard.mainPy)
 
       // Should find FastAPI app
       const fastApiRouter = result.routers.find((r) => r.type === "FastAPI")
@@ -152,9 +134,7 @@ import os
     })
 
     test("analyzes users.py fixture", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const usersPath = path.join(standardPath, "app", "routes", "users.py")
-      const result = analyzeFile(usersPath, parser)
+      const result = analyzeFile(fixtures.standard.usersPy, parser)
 
       assert.ok(result)
 

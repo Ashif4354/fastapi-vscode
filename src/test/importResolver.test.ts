@@ -1,28 +1,17 @@
 import * as assert from "node:assert"
-import * as path from "node:path"
+import { join } from "node:path"
 import { resolveImport, resolveNamedImport } from "../core/importResolver"
 import { Parser } from "../core/parser"
+import { fixtures, wasmPaths } from "./testUtils"
 
-const getWasmPaths = () => {
-  const wasmDir = path.join(__dirname, "..", "wasm")
-  return {
-    core: path.join(wasmDir, "web-tree-sitter.wasm"),
-    python: path.join(wasmDir, "tree-sitter-python.wasm"),
-  }
-}
-
-const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures", "standard")
-}
+const standardRoot = fixtures.standard.root
 
 suite("importResolver", () => {
-  let fixturesPath: string
   let parser: Parser
 
   suiteSetup(async () => {
-    fixturesPath = getFixturesPath()
     parser = new Parser()
-    await parser.init(getWasmPaths())
+    await parser.init(wasmPaths)
   })
 
   suiteTeardown(() => {
@@ -31,8 +20,8 @@ suite("importResolver", () => {
 
   suite("resolveImport", () => {
     test("resolves relative import to .py file", () => {
-      const currentFile = path.join(fixturesPath, "app", "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "app", "main.py")
+      const projectRoot = standardRoot
 
       const result = resolveImport(
         { modulePath: "routes.users", isRelative: true, relativeDots: 1 },
@@ -45,8 +34,8 @@ suite("importResolver", () => {
     })
 
     test("resolves relative import to __init__.py", () => {
-      const currentFile = path.join(fixturesPath, "app", "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "app", "main.py")
+      const projectRoot = standardRoot
 
       const result = resolveImport(
         { modulePath: "routes", isRelative: true, relativeDots: 1 },
@@ -61,8 +50,8 @@ suite("importResolver", () => {
     test("resolves double-dot relative import", () => {
       // from .. import something (2 dots, no module name)
       // From app/routes/users.py, this goes to parent package (app)
-      const currentFile = path.join(fixturesPath, "app", "routes", "users.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "app", "routes", "users.py")
+      const projectRoot = standardRoot
 
       const result = resolveImport(
         { modulePath: "", isRelative: true, relativeDots: 2 },
@@ -76,8 +65,8 @@ suite("importResolver", () => {
     })
 
     test("resolves absolute import", () => {
-      const currentFile = path.join(fixturesPath, "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "main.py")
+      const projectRoot = standardRoot
 
       const result = resolveImport(
         {
@@ -94,8 +83,8 @@ suite("importResolver", () => {
     })
 
     test("returns null for non-existent module", () => {
-      const currentFile = path.join(fixturesPath, "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "main.py")
+      const projectRoot = standardRoot
 
       const result = resolveImport(
         {
@@ -113,8 +102,8 @@ suite("importResolver", () => {
 
   suite("resolveNamedImport", () => {
     test("resolves named import to .py file", () => {
-      const currentFile = path.join(fixturesPath, "app", "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "app", "main.py")
+      const projectRoot = standardRoot
 
       const result = resolveNamedImport(
         {
@@ -133,8 +122,8 @@ suite("importResolver", () => {
     })
 
     test("resolves re-exported name from __init__.py", () => {
-      const currentFile = path.join(fixturesPath, "app", "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "app", "main.py")
+      const projectRoot = standardRoot
 
       // The __init__.py has: from .users import router as users_router
       const result = resolveNamedImport(
@@ -154,8 +143,8 @@ suite("importResolver", () => {
     })
 
     test("falls back to base module for non-existent named import", () => {
-      const currentFile = path.join(fixturesPath, "app", "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "app", "main.py")
+      const projectRoot = standardRoot
 
       const result = resolveNamedImport(
         {
@@ -177,8 +166,8 @@ suite("importResolver", () => {
     })
 
     test("resolves relative named import from namespace package (no __init__.py)", () => {
-      const currentFile = path.join(fixturesPath, "app", "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "app", "main.py")
+      const projectRoot = standardRoot
 
       // namespace_routes has no __init__.py, but api_routes.py exists
       const result = resolveNamedImport(
@@ -198,8 +187,8 @@ suite("importResolver", () => {
     })
 
     test("resolves absolute named import from namespace package (no __init__.py)", () => {
-      const currentFile = path.join(fixturesPath, "main.py")
-      const projectRoot = fixturesPath
+      const currentFile = join(standardRoot, "main.py")
+      const projectRoot = standardRoot
 
       // app.namespace_routes has no __init__.py, but api_routes.py exists
       const result = resolveNamedImport(

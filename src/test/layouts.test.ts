@@ -1,5 +1,4 @@
 import * as assert from "node:assert"
-import * as path from "node:path"
 import { Parser } from "../core/parser"
 import { findProjectRoot } from "../core/pathUtils"
 import { buildRouterGraph } from "../core/routerResolver"
@@ -9,18 +8,7 @@ import type {
   RouteDefinition,
   RouterDefinition,
 } from "../core/types"
-
-const getWasmPaths = () => {
-  const wasmDir = path.join(__dirname, "..", "wasm")
-  return {
-    core: path.join(wasmDir, "web-tree-sitter.wasm"),
-    python: path.join(wasmDir, "tree-sitter-python.wasm"),
-  }
-}
-
-const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures")
-}
+import { fixtures, wasmPaths } from "./testUtils"
 
 /** Collects all routes from an AppDefinition (direct routes + routes from all routers) */
 function collectAllRoutes(appDef: AppDefinition): RouteDefinition[] {
@@ -42,12 +30,10 @@ function collectAllRoutes(appDef: AppDefinition): RouteDefinition[] {
 
 suite("Project Layouts", () => {
   let parser: Parser
-  let testAppsPath: string
 
   suiteSetup(async () => {
     parser = new Parser()
-    await parser.init(getWasmPaths())
-    testAppsPath = getFixturesPath()
+    await parser.init(wasmPaths)
   })
 
   suiteTeardown(() => {
@@ -55,14 +41,19 @@ suite("Project Layouts", () => {
   })
 
   test("standard: discovers routes from package layout", () => {
-    const entryPath = path.join(testAppsPath, "standard", "app", "main.py")
-    const workspaceRoot = path.join(testAppsPath, "standard")
-    const projectRoot = findProjectRoot(entryPath, workspaceRoot)
+    const projectRoot = findProjectRoot(
+      fixtures.standard.mainPy,
+      fixtures.standard.root,
+    )
 
-    const graph = buildRouterGraph(entryPath, parser, projectRoot)
+    const graph = buildRouterGraph(
+      fixtures.standard.mainPy,
+      parser,
+      projectRoot,
+    )
     assert.ok(graph, "Should find FastAPI app")
 
-    const appDef = routerNodeToAppDefinition(graph, workspaceRoot)
+    const appDef = routerNodeToAppDefinition(graph, fixtures.standard.root)
     const allRoutes = collectAllRoutes(appDef)
 
     // Should have: GET /, GET /health, GET /users/, GET /users/{user_id}, POST /users/, GET /items/, GET /items/{item_id}
@@ -92,14 +83,15 @@ suite("Project Layouts", () => {
   })
 
   test("flat: discovers routes from flat layout", () => {
-    const entryPath = path.join(testAppsPath, "flat", "main.py")
-    const workspaceRoot = path.join(testAppsPath, "flat")
-    const projectRoot = findProjectRoot(entryPath, workspaceRoot)
+    const projectRoot = findProjectRoot(
+      fixtures.flat.mainPy,
+      fixtures.flat.root,
+    )
 
-    const graph = buildRouterGraph(entryPath, parser, projectRoot)
+    const graph = buildRouterGraph(fixtures.flat.mainPy, parser, projectRoot)
     assert.ok(graph, "Should find FastAPI app")
 
-    const appDef = routerNodeToAppDefinition(graph, workspaceRoot)
+    const appDef = routerNodeToAppDefinition(graph, fixtures.flat.root)
     const allRoutes = collectAllRoutes(appDef)
 
     // Should have: GET /, GET /api/users, GET /api/items
@@ -125,14 +117,19 @@ suite("Project Layouts", () => {
   })
 
   test("namespace: discovers routes from namespace package (no __init__.py)", () => {
-    const entryPath = path.join(testAppsPath, "namespace", "app", "main.py")
-    const workspaceRoot = path.join(testAppsPath, "namespace")
-    const projectRoot = findProjectRoot(entryPath, workspaceRoot)
+    const projectRoot = findProjectRoot(
+      fixtures.namespace.mainPy,
+      fixtures.namespace.root,
+    )
 
-    const graph = buildRouterGraph(entryPath, parser, projectRoot)
+    const graph = buildRouterGraph(
+      fixtures.namespace.mainPy,
+      parser,
+      projectRoot,
+    )
     assert.ok(graph, "Should find FastAPI app")
 
-    const appDef = routerNodeToAppDefinition(graph, workspaceRoot)
+    const appDef = routerNodeToAppDefinition(graph, fixtures.namespace.root)
     const allRoutes = collectAllRoutes(appDef)
 
     // Should have: GET /, GET /users/, GET /users/{user_id}, GET /items/
@@ -158,14 +155,19 @@ suite("Project Layouts", () => {
   })
 
   test("reexport: discovers routes from __init__.py re-exports", () => {
-    const entryPath = path.join(testAppsPath, "reexport", "app", "main.py")
-    const workspaceRoot = path.join(testAppsPath, "reexport")
-    const projectRoot = findProjectRoot(entryPath, workspaceRoot)
+    const projectRoot = findProjectRoot(
+      fixtures.reexport.mainPy,
+      fixtures.reexport.root,
+    )
 
-    const graph = buildRouterGraph(entryPath, parser, projectRoot)
+    const graph = buildRouterGraph(
+      fixtures.reexport.mainPy,
+      parser,
+      projectRoot,
+    )
     assert.ok(graph, "Should find FastAPI app")
 
-    const appDef = routerNodeToAppDefinition(graph, workspaceRoot)
+    const appDef = routerNodeToAppDefinition(graph, fixtures.reexport.root)
     const allRoutes = collectAllRoutes(appDef)
 
     // Should have: GET /, GET /integrations/github, GET /integrations/slack, POST /integrations/webhook

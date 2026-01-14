@@ -1,29 +1,14 @@
 import * as assert from "node:assert"
-import * as path from "node:path"
 import { Parser } from "../core/parser"
 import { buildRouterGraph } from "../core/routerResolver"
-
-// Tests run from dist/test/*.test.js, so we go up to dist, then into wasm
-const getWasmPaths = () => {
-  const wasmDir = path.join(__dirname, "..", "wasm")
-  return {
-    core: path.join(wasmDir, "web-tree-sitter.wasm"),
-    python: path.join(wasmDir, "tree-sitter-python.wasm"),
-  }
-}
-
-const getFixturesPath = () => {
-  return path.join(__dirname, "..", "..", "src", "test", "fixtures")
-}
+import { fixtures, fixturesPath, wasmPaths } from "./testUtils"
 
 suite("routerResolver", () => {
   let parser: Parser
-  let fixturesPath: string
 
   suiteSetup(async () => {
     parser = new Parser()
-    await parser.init(getWasmPaths())
-    fixturesPath = getFixturesPath()
+    await parser.init(wasmPaths)
   })
 
   suiteTeardown(() => {
@@ -32,20 +17,24 @@ suite("routerResolver", () => {
 
   suite("buildRouterGraph", () => {
     test("builds graph from main.py entry point", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       assert.ok(result)
       assert.strictEqual(result.type, "FastAPI")
       assert.strictEqual(result.variableName, "app")
-      assert.strictEqual(result.filePath, mainPyPath)
+      assert.strictEqual(result.filePath, fixtures.standard.mainPy)
     })
 
     test("includes direct routes on app", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       assert.ok(result)
       // app/main.py has @app.get("/health")
@@ -56,9 +45,11 @@ suite("routerResolver", () => {
     })
 
     test("follows include_router to child routers", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       assert.ok(result)
       // app/main.py includes users and items routers
@@ -69,9 +60,11 @@ suite("routerResolver", () => {
     })
 
     test("captures prefix from router definition", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       assert.ok(result)
       // users.router has prefix="/users" in its definition
@@ -91,18 +84,22 @@ suite("routerResolver", () => {
     })
 
     test("returns null for file without FastAPI/APIRouter", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const initPath = path.join(standardPath, "app", "__init__.py")
-      const result = buildRouterGraph(initPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.initPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       // __init__.py has no FastAPI or APIRouter
       assert.strictEqual(result, null)
     })
 
     test("builds graph from APIRouter file", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const usersPath = path.join(standardPath, "app", "routes", "users.py")
-      const result = buildRouterGraph(usersPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.usersPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       assert.ok(result)
       assert.strictEqual(result.type, "APIRouter")
@@ -113,9 +110,11 @@ suite("routerResolver", () => {
     })
 
     test("includes line numbers for routes", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const usersPath = path.join(standardPath, "app", "routes", "users.py")
-      const result = buildRouterGraph(usersPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.usersPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       assert.ok(result)
       for (const route of result.routes) {
@@ -125,26 +124,25 @@ suite("routerResolver", () => {
     })
 
     test("includes router location info", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const usersPath = path.join(standardPath, "app", "routes", "users.py")
-      const result = buildRouterGraph(usersPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.usersPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       assert.ok(result)
-      assert.strictEqual(result.filePath, usersPath)
+      assert.strictEqual(result.filePath, fixtures.standard.usersPy)
       assert.ok(result.line > 0)
       assert.ok(result.column >= 0)
     })
 
     test("follows __init__.py re-exports to actual router file", () => {
       // Use reexport fixture which has integrations/__init__.py re-exporting from router.py
-      const reexportPath = path.join(fixturesPath, "reexport")
-      const initPath = path.join(
-        reexportPath,
-        "app",
-        "integrations",
-        "__init__.py",
+      const result = buildRouterGraph(
+        fixtures.reexport.initPy,
+        parser,
+        fixtures.reexport.root,
       )
-      const result = buildRouterGraph(initPath, parser, reexportPath)
 
       assert.ok(result, "Should find router via re-export")
       assert.strictEqual(result.type, "APIRouter")
@@ -163,9 +161,11 @@ suite("routerResolver", () => {
     })
 
     test("includes router when following include_router chain", () => {
-      const standardPath = path.join(fixturesPath, "standard")
-      const mainPyPath = path.join(standardPath, "app", "main.py")
-      const result = buildRouterGraph(mainPyPath, parser, standardPath)
+      const result = buildRouterGraph(
+        fixtures.standard.mainPy,
+        parser,
+        fixtures.standard.root,
+      )
 
       assert.ok(result)
 

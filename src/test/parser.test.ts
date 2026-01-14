@@ -1,16 +1,6 @@
 import * as assert from "node:assert"
-import * as path from "node:path"
 import { Parser } from "../core/parser"
-
-// Get paths relative to this file's location when compiled
-// Tests run from dist/test/*.test.js, so we go up to dist, then into wasm
-const getWasmPaths = () => {
-  const wasmDir = path.join(__dirname, "..", "wasm")
-  return {
-    core: path.join(wasmDir, "web-tree-sitter.wasm"),
-    python: path.join(wasmDir, "tree-sitter-python.wasm"),
-  }
-}
+import { wasmPaths } from "./testUtils"
 
 suite("parser", () => {
   test("throws error if parse called before init", () => {
@@ -20,7 +10,7 @@ suite("parser", () => {
 
   test("parses Python code after init", async () => {
     const parser = new Parser()
-    await parser.init(getWasmPaths())
+    await parser.init(wasmPaths)
 
     const tree = parser.parse("x = 1")
     assert.ok(tree)
@@ -31,8 +21,8 @@ suite("parser", () => {
 
   test("double init is safe", async () => {
     const parser = new Parser()
-    await parser.init(getWasmPaths())
-    await parser.init(getWasmPaths()) // Should not throw
+    await parser.init(wasmPaths)
+    await parser.init(wasmPaths) // Should not throw
 
     const tree = parser.parse("y = 2")
     assert.ok(tree)
@@ -42,7 +32,7 @@ suite("parser", () => {
 
   test("parses decorated function", async () => {
     const parser = new Parser()
-    await parser.init(getWasmPaths())
+    await parser.init(wasmPaths)
 
     const code = `
 @router.get("/users")
@@ -62,7 +52,7 @@ def get_users():
 
   test("dispose is safe to call multiple times", async () => {
     const parser = new Parser()
-    await parser.init(getWasmPaths())
+    await parser.init(wasmPaths)
 
     parser.dispose()
     parser.dispose() // Should not throw
