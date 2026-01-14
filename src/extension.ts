@@ -2,6 +2,7 @@
  * VSCode extension entry point for FastAPI endpoint discovery.
  */
 
+import { existsSync } from "node:fs"
 import { sep } from "node:path"
 import * as vscode from "vscode"
 import { clearImportCache } from "./core/importResolver"
@@ -34,18 +35,22 @@ async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
       const entryPath = customEntryPoint.startsWith("/")
         ? customEntryPoint
         : vscode.Uri.joinPath(folder.uri, customEntryPoint).fsPath
+
+      if (!existsSync(entryPath)) {
+        vscode.window.showWarningMessage(
+          `FastAPI entry point not found: ${customEntryPoint}`,
+        )
+        continue
+      }
+
       candidates = [entryPath]
     } else {
       // Scan for main.py and __init__.py files (likely FastAPI entry points)
       const mainFiles = await vscode.workspace.findFiles(
         new vscode.RelativePattern(folder, "**/main.py"),
-        undefined,
-        20,
       )
       const initFiles = await vscode.workspace.findFiles(
         new vscode.RelativePattern(folder, "**/__init__.py"),
-        undefined,
-        20,
       )
       // Prefer main.py, then __init__.py, sorted by path depth (shallower first)
       candidates = [...mainFiles, ...initFiles]
@@ -68,10 +73,6 @@ async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
 }
 
 function navigateToLocation(location: SourceLocation): void {
-  if (!location.filePath) {
-    vscode.window.showErrorMessage("File path is missing for the endpoint.")
-    return
-  }
   const uri = vscode.Uri.file(location.filePath)
   const position = new vscode.Position(location.line - 1, location.column)
   vscode.window.showTextDocument(uri, {

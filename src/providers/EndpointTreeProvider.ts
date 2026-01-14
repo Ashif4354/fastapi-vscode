@@ -39,9 +39,6 @@ const METHOD_ICONS: Record<RouteMethod, string> = {
   WEBSOCKET: "broadcast",
 }
 
-/** Parent directories that don't provide useful context for labels */
-const GENERIC_PARENT_DIRS = new Set(["routes", "api", "routers", "endpoints"])
-
 export class EndpointTreeProvider
   implements TreeDataProvider<EndpointTreeItem>
 {
@@ -346,17 +343,11 @@ export class EndpointTreeProvider
             // Add / prefix to tag-based labels for consistency
             routerLabel = `/${element.router.tags[0]}`
           } else {
-            // Use parent directory + filename for context (e.g., "integrations/router")
+            // Use filename as label (e.g., "api_routes" from "routes/api_routes.py")
             const filePath = element.router.location.filePath
-            const parts = filePath.split("/")
-            const fileName = parts.pop()?.replace(/\.py$/, "") ?? ""
-            const parentDir = parts.pop() ?? ""
-            // Skip generic parent dirs like "routes" or "api"
-            if (parentDir && !GENERIC_PARENT_DIRS.has(parentDir)) {
-              routerLabel = `${parentDir}/${fileName}`
-            } else {
-              routerLabel = fileName
-            }
+            const fileName =
+              filePath.split("/").pop()?.replace(/\.py$/, "") ?? ""
+            routerLabel = fileName
           }
         }
         const routerItem = new TreeItem(

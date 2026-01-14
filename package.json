@@ -46,12 +46,21 @@
         "command": "fastapi-vscode.copyEndpointPath",
         "title": "Copy Endpoint Path",
         "category": "FastAPI"
+      },
+      {
+        "command": "fastapi-vscode.goToRouter",
+        "title": "Go to Router Definition",
+        "category": "FastAPI"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "fastapi-vscode.copyEndpointPath",
+          "when": "false"
+        },
+        {
+          "command": "fastapi-vscode.goToRouter",
           "when": "false"
         }
       ],
@@ -71,6 +80,11 @@
         {
           "command": "fastapi-vscode.copyEndpointPath",
           "when": "view == endpoint-explorer && viewItem == route",
+          "group": "navigation"
+        },
+        {
+          "command": "fastapi-vscode.goToRouter",
+          "when": "view == endpoint-explorer && viewItem == router",
           "group": "navigation"
         }
       ]
