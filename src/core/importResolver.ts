@@ -1,8 +1,42 @@
+/**
+ * Python import resolution for static analysis.
+ *
+ * Resolves Python import statements to file paths without executing code.
+ * Handles relative imports, absolute imports, namespace packages (PEP 420),
+ * and re-exports from __init__.py files.
+ *
+ * Resolution order (matching Python):
+ * 1. module.py (direct file)
+ * 2. module/__init__.py (package)
+ * 3. module/ without __init__.py (namespace package)
+ */
+
 import { existsSync } from "node:fs"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 import { analyzeFile } from "./analyzer"
 import type { ImportInfo } from "./internal"
 import type { Parser } from "./parser"
+
+/**
+ * Cache for file existence checks to avoid repeated filesystem calls.
+ * Maps file path -> exists (true/false).
+ */
+const fileExistsCache = new Map<string, boolean>()
+
+function cachedExistsSync(path: string): boolean {
+  const cached = fileExistsCache.get(path)
+  if (cached !== undefined) {
+    return cached
+  }
+  const exists = existsSync(path)
+  fileExistsCache.set(path, exists)
+  return exists
+}
+
+/** Clears the file existence cache. Call when files may have changed. */
+export function clearImportCache(): void {
+  fileExistsCache.clear()
+}
 
 /**
  * Resolves a module path to its Python file.
@@ -10,11 +44,13 @@ import type { Parser } from "./parser"
  * (matching Python's import resolution order).
  */
 function resolvePythonModule(basePath: string): string | null {
-  if (existsSync(`${basePath}.py`)) {
-    return `${basePath}.py`
+  const pyPath = `${basePath}.py`
+  if (cachedExistsSync(pyPath)) {
+    return pyPath
   }
-  if (existsSync(`${basePath}/__init__.py`)) {
-    return `${basePath}/__init__.py`
+  const initPath = join(basePath, "__init__.py")
+  if (cachedExistsSync(initPath)) {
+    return initPath
   }
   return null
 }
@@ -41,30 +77,50 @@ function findImportByExportedName(
 }
 
 /**
- * Base resolution of a module import to its file path.
- * Handles both relative and absolute imports.
+ * Converts a Python module path to a filesystem directory path.
+ *
+ * Examples (modulePath, relativeDots → result):
+ *   Absolute: ("app.api.routes", 0) from projectRoot="/project" → "/project/app/api/routes"
+ *   Relative: ("routes", 1) from "/project/app/api/main.py" → "/project/app/api/routes"
+ *   Relative: ("routes", 2) from "/project/app/api/main.py" → "/project/app/routes"
+ */
+function modulePathToDir(
+  importInfo: Pick<ImportInfo, "modulePath" | "isRelative" | "relativeDots">,
+  currentFilePath: string,
+  projectRoot: string,
+): string {
+  let baseDir: string
+  if (importInfo.isRelative) {
+    // For relative imports, go up 'relativeDots' directories from current file
+    baseDir = dirname(currentFilePath)
+    for (let i = 1; i < importInfo.relativeDots; i++) {
+      baseDir = dirname(baseDir)
+    }
+  } else {
+    baseDir = projectRoot
+  }
+
+  if (importInfo.modulePath) {
+    return join(baseDir, ...importInfo.modulePath.split("."))
+  }
+  return baseDir
+}
+
+/**
+ * Resolves a module import to its file path.
+ *
+ * Examples:
+ *   "from app.api import routes" → "/project/app/api/routes.py" or "/project/app/api/routes/__init__.py"
+ *   "from .routes import users" → "/project/app/api/routes.py" or "/project/app/api/routes/__init__.py"
+ *
+ * Returns null if the module doesn't exist (may be a namespace package).
  */
 export function resolveImport(
   importInfo: Pick<ImportInfo, "modulePath" | "isRelative" | "relativeDots">,
   currentFilePath: string,
   projectRoot: string,
 ): string | null {
-  let resolvedPath: string
-
-  if (importInfo.isRelative) {
-    // For relative imports, go up 'relativeDots' directories from current file
-    let currentDir = dirname(currentFilePath)
-    for (let i = 1; i < importInfo.relativeDots; i++) {
-      currentDir = dirname(currentDir)
-    }
-    resolvedPath = importInfo.modulePath
-      ? `${currentDir}/${importInfo.modulePath.replace(/\./g, "/")}`
-      : currentDir
-    // Absolute import
-  } else {
-    resolvedPath = `${projectRoot}/${importInfo.modulePath.replace(/\./g, "/")}`
-  }
-
+  const resolvedPath = modulePathToDir(importInfo, currentFilePath, projectRoot)
   return resolvePythonModule(resolvedPath)
 }
 
@@ -83,22 +139,24 @@ export function resolveNamedImport(
   parser?: Parser,
 ): string | null {
   const basePath = resolveImport(importInfo, currentFilePath, projectRoot)
-  if (!basePath) {
-    return null
-  }
 
-  const baseDir = dirname(basePath)
+  // Calculate base directory for named import resolution.
+  // For namespace packages (directories without __init__.py), basePath will be null,
+  // so we compute the directory path directly from the module path.
+  const baseDir = basePath
+    ? dirname(basePath)
+    : modulePathToDir(importInfo, currentFilePath, projectRoot)
 
   for (const name of importInfo.names) {
     // Try direct file: from .routes import users -> routes/users.py
-    const namedPath = `${baseDir}/${name.replace(/\./g, "/")}`
+    const namedPath = join(baseDir, ...name.split("."))
     const resolved = resolvePythonModule(namedPath)
     if (resolved) {
       return resolved
     }
 
     // Try re-exports: from .routes import users where routes/__init__.py re-exports users
-    if (basePath.endsWith("__init__.py") && parser) {
+    if (basePath?.endsWith("__init__.py") && parser) {
       const analysis = analyzeFile(basePath, parser)
       const imp = analysis && findImportByExportedName(analysis.imports, name)
       if (imp) {

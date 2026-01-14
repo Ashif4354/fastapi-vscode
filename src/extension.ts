@@ -2,9 +2,11 @@
  * VSCode extension entry point for FastAPI endpoint discovery.
  */
 
+import { sep } from "node:path"
 import * as vscode from "vscode"
+import { clearImportCache } from "./core/importResolver"
 import { Parser } from "./core/parser"
-import { stripLeadingDynamicSegments } from "./core/pathUtils"
+import { findProjectRoot, stripLeadingDynamicSegments } from "./core/pathUtils"
 import { buildRouterGraph } from "./core/routerResolver"
 import { routerNodeToAppDefinition } from "./core/transformer"
 import type { AppDefinition, SourceLocation } from "./core/types"
@@ -21,25 +23,38 @@ async function discoverFastAPIApps(parser: Parser): Promise<AppDefinition[]> {
     return apps
   }
 
-  const defaultPatterns = [
-    "main.py",
-    "app/main.py",
-    "api/main.py",
-    "src/main.py",
-    "backend/app/main.py",
-  ]
-
   for (const folder of workspaceFolders) {
     const config = vscode.workspace.getConfiguration("fastapi", folder.uri)
     const customEntryPoint = config.get<string>("entryPoint")
-    const patterns = customEntryPoint ? [customEntryPoint] : defaultPatterns
 
-    for (const pattern of patterns) {
-      // Handle both relative patterns and absolute paths
-      const entryPath = pattern.startsWith("/")
-        ? pattern
-        : vscode.Uri.joinPath(folder.uri, pattern).fsPath
-      const projectRoot = entryPath.split("/").slice(0, -2).join("/")
+    let candidates: string[] = []
+
+    if (customEntryPoint) {
+      // Use custom entry point if specified
+      const entryPath = customEntryPoint.startsWith("/")
+        ? customEntryPoint
+        : vscode.Uri.joinPath(folder.uri, customEntryPoint).fsPath
+      candidates = [entryPath]
+    } else {
+      // Scan for main.py and __init__.py files (likely FastAPI entry points)
+      const mainFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, "**/main.py"),
+        undefined,
+        20,
+      )
+      const initFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, "**/__init__.py"),
+        undefined,
+        20,
+      )
+      // Prefer main.py, then __init__.py, sorted by path depth (shallower first)
+      candidates = [...mainFiles, ...initFiles]
+        .map((uri) => uri.fsPath)
+        .sort((a, b) => a.split(sep).length - b.split(sep).length)
+    }
+
+    for (const entryPath of candidates) {
+      const projectRoot = findProjectRoot(entryPath, folder.uri.fsPath)
       const routerNode = buildRouterGraph(entryPath, parser, projectRoot)
 
       if (routerNode) {
@@ -95,6 +110,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "fastapi-vscode.refreshEndpoints",
       async () => {
+        clearImportCache()
         const newApps = await discoverFastAPIApps(parserService)
         endpointProvider.setApps(newApps)
       },

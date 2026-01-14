@@ -183,5 +183,47 @@ suite("importResolver", () => {
         result.endsWith("routes/__init__.py") || result.endsWith("routes.py"),
       )
     })
+
+    test("resolves relative named import from namespace package (no __init__.py)", () => {
+      const currentFile = path.join(fixturesPath, "app", "api", "main.py")
+      const projectRoot = fixturesPath
+
+      // namespace_routes has no __init__.py, but api_routes.py exists
+      const result = resolveNamedImport(
+        {
+          modulePath: "namespace_routes",
+          names: ["api_routes"],
+          isRelative: true,
+          relativeDots: 1,
+        },
+        currentFile,
+        projectRoot,
+        parser,
+      )
+
+      assert.ok(result)
+      assert.ok(result.endsWith("api_routes.py"))
+    })
+
+    test("resolves absolute named import from namespace package (no __init__.py)", () => {
+      const currentFile = path.join(fixturesPath, "main.py")
+      const projectRoot = fixturesPath
+
+      // app.api.namespace_routes has no __init__.py, but api_routes.py exists
+      const result = resolveNamedImport(
+        {
+          modulePath: "app.api.namespace_routes",
+          names: ["api_routes"],
+          isRelative: false,
+          relativeDots: 0,
+        },
+        currentFile,
+        projectRoot,
+        parser,
+      )
+
+      assert.ok(result)
+      assert.ok(result.endsWith("api_routes.py"))
+    })
   })
 })

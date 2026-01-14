@@ -279,6 +279,29 @@ def handler():
 
       assert.strictEqual(result, null)
     })
+
+    test("extracts qualified fastapi.FastAPI() call", () => {
+      const code = "app = fastapi.FastAPI()"
+      const tree = parse(code)
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const result = routerExtractor(assignments[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.variableName, "app")
+      assert.strictEqual(result.type, "FastAPI")
+    })
+
+    test("extracts qualified fastapi.APIRouter() call", () => {
+      const code = "router = fastapi.APIRouter(prefix='/api')"
+      const tree = parse(code)
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const result = routerExtractor(assignments[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.variableName, "router")
+      assert.strictEqual(result.type, "APIRouter")
+      assert.strictEqual(result.prefix, "/api")
+    })
   })
 
   suite("importExtractor", () => {

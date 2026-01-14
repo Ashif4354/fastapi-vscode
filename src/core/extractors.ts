@@ -190,9 +190,10 @@ export function routerExtractor(node: Node): RouterInfo | null {
 
   if (valueNode.type === "call") {
     const functionNameNode = valueNode.childForFieldName("function")
-    if (functionNameNode && functionNameNode.text === "APIRouter") {
+    const funcName = functionNameNode?.text
+    if (funcName === "APIRouter" || funcName === "fastapi.APIRouter") {
       type = "APIRouter"
-    } else if (functionNameNode && functionNameNode.text === "FastAPI") {
+    } else if (funcName === "FastAPI" || funcName === "fastapi.FastAPI") {
       type = "FastAPI"
     }
 

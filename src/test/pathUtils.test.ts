@@ -1,9 +1,16 @@
 import * as assert from "node:assert"
+import * as path from "node:path"
 import {
   countSegments,
+  findProjectRoot,
   getPathSegments,
+  isWithinDirectory,
   stripLeadingDynamicSegments,
 } from "../core/pathUtils"
+
+const getFixturesPath = () => {
+  return path.join(__dirname, "..", "..", "src", "test", "fixtures", "python")
+}
 
 suite("pathUtils", () => {
   suite("stripLeadingDynamicSegments", () => {
@@ -103,6 +110,76 @@ suite("pathUtils", () => {
 
     test("ignores trailing slashes", () => {
       assert.strictEqual(countSegments("/users/posts/"), 2)
+    })
+  })
+
+  suite("isWithinDirectory", () => {
+    test("returns true for path inside directory", () => {
+      assert.strictEqual(isWithinDirectory("/foo/bar/baz", "/foo/bar"), true)
+    })
+
+    test("returns true for path equal to directory", () => {
+      assert.strictEqual(isWithinDirectory("/foo/bar", "/foo/bar"), true)
+    })
+
+    test("returns false for path outside directory", () => {
+      assert.strictEqual(isWithinDirectory("/foo/baz", "/foo/bar"), false)
+    })
+
+    test("returns false for sibling with similar prefix", () => {
+      // This is the key test - /foo/ba is NOT a parent of /foo/bar
+      assert.strictEqual(isWithinDirectory("/foo/bar", "/foo/ba"), false)
+    })
+
+    test("returns false for parent directory", () => {
+      assert.strictEqual(isWithinDirectory("/foo", "/foo/bar"), false)
+    })
+  })
+
+  suite("findProjectRoot", () => {
+    let fixturesPath: string
+
+    suiteSetup(() => {
+      fixturesPath = getFixturesPath()
+    })
+
+    test("returns entry dir when no __init__.py present", () => {
+      // main.py is at fixtures/python/main.py, and fixtures/python has no __init__.py
+      const mainPyPath = path.join(fixturesPath, "main.py")
+      const result = findProjectRoot(mainPyPath, fixturesPath)
+
+      assert.strictEqual(result, fixturesPath)
+    })
+
+    test("walks up to find project root from nested package", () => {
+      // users.py is in app/api/routes/users.py
+      // app has __init__.py, api has __init__.py, routes has __init__.py
+      // but fixtures/python does not, so project root should be fixtures/python
+      const usersPath = path.join(
+        fixturesPath,
+        "app",
+        "api",
+        "routes",
+        "users.py",
+      )
+      const result = findProjectRoot(usersPath, fixturesPath)
+
+      assert.strictEqual(result, fixturesPath)
+    })
+
+    test("returns workspace root when all dirs have __init__.py", () => {
+      // If we pretend the workspace root is app/api, it should return that
+      const usersPath = path.join(
+        fixturesPath,
+        "app",
+        "api",
+        "routes",
+        "users.py",
+      )
+      const apiRoot = path.join(fixturesPath, "app", "api")
+      const result = findProjectRoot(usersPath, apiRoot)
+
+      assert.strictEqual(result, apiRoot)
     })
   })
 })
