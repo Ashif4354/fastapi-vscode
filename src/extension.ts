@@ -80,8 +80,10 @@ function navigateToLocation(location: SourceLocation): void {
   })
 }
 
+let parserService: Parser | null = null
+
 export async function activate(context: vscode.ExtensionContext) {
-  const parserService = new Parser()
+  parserService = new Parser()
   await parserService.init({
     core: vscode.Uri.joinPath(
       context.extensionUri,
@@ -111,6 +113,9 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "fastapi-vscode.refreshEndpoints",
       async () => {
+        if (!parserService) {
+          return
+        }
         clearImportCache()
         const newApps = await discoverFastAPIApps(parserService)
         endpointProvider.setApps(newApps)
@@ -152,4 +157,8 @@ export async function activate(context: vscode.ExtensionContext) {
   )
 }
 
-export function deactivate() {}
+export function deactivate() {
+  parserService?.dispose()
+  parserService = null
+  clearImportCache()
+}

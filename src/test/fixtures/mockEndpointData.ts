@@ -19,7 +19,7 @@ export const mockApps: AppDefinition[] = [
         routes: [
           {
             method: "GET",
-            path: "/",
+            path: "/api/v1/users/",
             functionName: "list_users",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/users.py",
@@ -29,7 +29,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "POST",
-            path: "/",
+            path: "/api/v1/users/",
             functionName: "create_user",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/users.py",
@@ -39,7 +39,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "GET",
-            path: "/{user_id}",
+            path: "/api/v1/users/{user_id}",
             functionName: "get_user",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/users.py",
@@ -49,7 +49,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "PUT",
-            path: "/{user_id}",
+            path: "/api/v1/users/{user_id}",
             functionName: "update_user",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/users.py",
@@ -59,7 +59,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "DELETE",
-            path: "/{user_id}",
+            path: "/api/v1/users/{user_id}",
             functionName: "delete_user",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/users.py",
@@ -82,7 +82,7 @@ export const mockApps: AppDefinition[] = [
         routes: [
           {
             method: "GET",
-            path: "/",
+            path: "/api/v1/items/",
             functionName: "list_items",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/items.py",
@@ -92,7 +92,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "POST",
-            path: "/",
+            path: "/api/v1/items/",
             functionName: "create_item",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/items.py",
@@ -102,7 +102,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "GET",
-            path: "/{item_id}",
+            path: "/api/v1/items/{item_id}",
             functionName: "get_item",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/items.py",
@@ -125,7 +125,7 @@ export const mockApps: AppDefinition[] = [
         routes: [
           {
             method: "WEBSOCKET",
-            path: "/chat",
+            path: "/ws/chat",
             functionName: "websocket_chat",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/websocket.py",
@@ -135,7 +135,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "WEBSOCKET",
-            path: "/notifications",
+            path: "/ws/notifications",
             functionName: "websocket_notifications",
             location: {
               filePath: "/Users/dev/ecommerce-api/app/routers/websocket.py",
@@ -215,7 +215,7 @@ export const mockApps: AppDefinition[] = [
         routes: [
           {
             method: "GET",
-            path: "/daily",
+            path: "/api/metrics/daily",
             functionName: "get_daily_metrics",
             location: {
               filePath: "/Users/dev/analytics-service/src/routers/metrics.py",
@@ -225,7 +225,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "GET",
-            path: "/weekly",
+            path: "/api/metrics/weekly",
             functionName: "get_weekly_metrics",
             location: {
               filePath: "/Users/dev/analytics-service/src/routers/metrics.py",
@@ -235,7 +235,7 @@ export const mockApps: AppDefinition[] = [
           },
           {
             method: "POST",
-            path: "/export",
+            path: "/api/metrics/export",
             functionName: "export_metrics",
             location: {
               filePath: "/Users/dev/analytics-service/src/routers/metrics.py",

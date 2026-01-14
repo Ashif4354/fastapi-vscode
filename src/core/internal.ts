@@ -9,7 +9,7 @@ import type { RouteMethod } from "./types"
  * Valid HTTP methods plus WEBSOCKET, used for decorator validation.
  * Lowercase for case-insensitive comparison during extraction.
  */
-export const ROUTE_METHODS = new Set([
+export const ROUTE_METHODS: ReadonlySet<string> = new Set([
   "get",
   "post",
   "put",

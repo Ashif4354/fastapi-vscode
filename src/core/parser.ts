@@ -32,5 +32,6 @@ export class Parser {
 
   dispose() {
     this.parser?.delete()
+    this.parser = null
   }
 }
