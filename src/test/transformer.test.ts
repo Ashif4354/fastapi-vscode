@@ -201,6 +201,7 @@ suite("transformer", () => {
         children: [
           {
             prefix: "/api/v1",
+            tags: [],
             router: {
               type: "APIRouter" as const,
               variableName: "login_router",
@@ -223,6 +224,7 @@ suite("transformer", () => {
           },
           {
             prefix: "/api/v1",
+            tags: [],
             router: {
               type: "APIRouter" as const,
               variableName: "utils_router",
