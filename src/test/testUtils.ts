@@ -1,19 +1,14 @@
 import { join } from "node:path"
 
-export const wasmDir = join(__dirname, "..", "wasm")
+declare const __DIST_ROOT__: string
+
+export const wasmDir = join(__DIST_ROOT__, "wasm")
 export const wasmPaths = {
   core: join(wasmDir, "web-tree-sitter.wasm"),
   python: join(wasmDir, "tree-sitter-python.wasm"),
 }
 
-export const fixturesPath = join(
-  __dirname,
-  "..",
-  "..",
-  "src",
-  "test",
-  "fixtures",
-)
+export const fixturesPath = join(__DIST_ROOT__, "..", "src", "test", "fixtures")
 export const fixtures = {
   standard: {
     root: join(fixturesPath, "standard"),

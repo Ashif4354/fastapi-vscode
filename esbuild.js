@@ -45,6 +45,7 @@ async function main() {
     logLevel: "info",
     define: {
       "process.env.NODE_ENV": production ? '"production"' : '"development"',
+      __DIST_ROOT__: JSON.stringify(path.join(import.meta.dirname, "dist")),
     },
   })
 

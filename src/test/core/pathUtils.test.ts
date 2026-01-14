@@ -6,8 +6,8 @@ import {
   getPathSegments,
   isWithinDirectory,
   stripLeadingDynamicSegments,
-} from "../core/pathUtils"
-import { fixtures } from "./testUtils"
+} from "../../core/pathUtils"
+import { fixtures } from "../testUtils"
 
 const standardRoot = fixtures.standard.root
 

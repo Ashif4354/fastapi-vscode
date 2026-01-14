@@ -6,9 +6,9 @@ import {
   includeRouterExtractor,
   mountExtractor,
   routerExtractor,
-} from "../core/extractors"
-import { Parser } from "../core/parser"
-import { wasmPaths } from "./testUtils"
+} from "../../core/extractors"
+import { Parser } from "../../core/parser"
+import { wasmPaths } from "../testUtils"
 
 suite("Extractors", () => {
   let parser: Parser

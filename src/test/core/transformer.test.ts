@@ -1,8 +1,8 @@
 import * as assert from "node:assert"
-import { Parser } from "../core/parser"
-import { buildRouterGraph } from "../core/routerResolver"
-import { routerNodeToAppDefinition } from "../core/transformer"
-import { fixtures, wasmPaths } from "./testUtils"
+import { Parser } from "../../core/parser"
+import { buildRouterGraph } from "../../core/routerResolver"
+import { routerNodeToAppDefinition } from "../../core/transformer"
+import { fixtures, wasmPaths } from "../testUtils"
 
 suite("transformer", () => {
   let parser: Parser

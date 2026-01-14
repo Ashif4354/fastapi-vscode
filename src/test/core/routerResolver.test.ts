@@ -1,7 +1,7 @@
 import * as assert from "node:assert"
-import { Parser } from "../core/parser"
-import { buildRouterGraph } from "../core/routerResolver"
-import { fixtures, fixturesPath, wasmPaths } from "./testUtils"
+import { Parser } from "../../core/parser"
+import { buildRouterGraph } from "../../core/routerResolver"
+import { fixtures, fixturesPath, wasmPaths } from "../testUtils"
 
 suite("routerResolver", () => {
   let parser: Parser

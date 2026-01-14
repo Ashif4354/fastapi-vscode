@@ -1,6 +1,6 @@
 import * as assert from "node:assert"
-import { Parser } from "../core/parser"
-import { wasmPaths } from "./testUtils"
+import { Parser } from "../../core/parser"
+import { wasmPaths } from "../testUtils"
 
 suite("parser", () => {
   test("throws error if parse called before init", () => {

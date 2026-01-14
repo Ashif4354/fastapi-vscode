@@ -1,17 +1,14 @@
 import * as assert from "node:assert"
-import { analyzeFile, analyzeTree } from "../core/analyzer"
-import { Parser } from "../core/parser"
-import { fixtures, wasmPaths } from "./testUtils"
+import { analyzeFile, analyzeTree } from "../../core/analyzer"
+import { Parser } from "../../core/parser"
+import { fixtures, wasmPaths } from "../testUtils"
 
 suite("analyzer", () => {
   let parser: Parser
 
-  // Helper to parse code and assert tree is not null
   const parse = (code: string) => {
     const tree = parser.parse(code)
-    if (!tree) {
-      throw new Error("Failed to parse code")
-    }
+    assert.ok(tree, "Failed to parse code")
     return tree
   }
 

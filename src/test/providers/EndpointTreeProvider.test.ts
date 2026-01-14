@@ -1,6 +1,6 @@
 import * as assert from "node:assert"
-import { EndpointTreeProvider } from "../providers/EndpointTreeProvider"
-import { mockApps } from "./fixtures/mockEndpointData"
+import { EndpointTreeProvider } from "../../providers/EndpointTreeProvider"
+import { mockApps } from "../fixtures/mockEndpointData"
 
 suite("EndpointTreeProvider", () => {
   let provider: EndpointTreeProvider

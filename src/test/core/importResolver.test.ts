@@ -1,8 +1,8 @@
 import * as assert from "node:assert"
 import { join } from "node:path"
-import { resolveImport, resolveNamedImport } from "../core/importResolver"
-import { Parser } from "../core/parser"
-import { fixtures, wasmPaths } from "./testUtils"
+import { resolveImport, resolveNamedImport } from "../../core/importResolver"
+import { Parser } from "../../core/parser"
+import { fixtures, wasmPaths } from "../testUtils"
 
 const standardRoot = fixtures.standard.root
 

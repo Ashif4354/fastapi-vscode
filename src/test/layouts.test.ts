@@ -12,20 +12,12 @@ import { fixtures, wasmPaths } from "./testUtils"
 
 /** Collects all routes from an AppDefinition (direct routes + routes from all routers) */
 function collectAllRoutes(appDef: AppDefinition): RouteDefinition[] {
-  const routes: RouteDefinition[] = [...appDef.routes]
+  const collectFromRouter = (router: RouterDefinition): RouteDefinition[] => [
+    ...router.routes,
+    ...router.children.flatMap(collectFromRouter),
+  ]
 
-  function collectFromRouter(router: RouterDefinition): void {
-    routes.push(...router.routes)
-    for (const child of router.children) {
-      collectFromRouter(child)
-    }
-  }
-
-  for (const router of appDef.routers) {
-    collectFromRouter(router)
-  }
-
-  return routes
+  return [...appDef.routes, ...appDef.routers.flatMap(collectFromRouter)]
 }
 
 suite("Project Layouts", () => {
