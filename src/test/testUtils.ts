@@ -43,4 +43,15 @@ export const fixtures = {
     root: join(fixturesPath, "multi-app"),
     mainPy: join(fixturesPath, "multi-app", "main.py"),
   },
+  aliasedImport: {
+    root: join(fixturesPath, "aliased-import"),
+    mainPy: join(fixturesPath, "aliased-import", "app", "main.py"),
+    tokensPy: join(
+      fixturesPath,
+      "aliased-import",
+      "app",
+      "routes",
+      "tokens.py",
+    ),
+  },
 }

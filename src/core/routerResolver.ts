@@ -235,10 +235,18 @@ function resolveRouterReference(
     return null
   }
 
+  // Find the original import name (in case moduleName is an alias)
+  // e.g., "from .api_tokens import router as api_tokens_router"
+  // moduleName = "api_tokens_router", originalName = "router"
+  const namedImport = matchingImport.namedImports.find(
+    (ni) => (ni.alias ?? ni.name) === moduleName,
+  )
+  const originalName = namedImport?.name ?? moduleName
+
   const importedFilePath = resolveNamedImport(
     {
       modulePath: matchingImport.modulePath,
-      names: [moduleName],
+      names: [originalName],
       isRelative: matchingImport.isRelative,
       relativeDots: matchingImport.relativeDots,
     },
