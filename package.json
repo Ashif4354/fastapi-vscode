@@ -161,7 +161,7 @@
         {
           "id": "fastapi",
           "title": "FastAPI",
-          "icon": "media/icons/logo-white.svg"
+          "icon": "media/icons/logo-outline.svg"
         }
       ]
     },
@@ -170,7 +170,7 @@
         {
           "id": "endpoint-explorer",
           "name": "Endpoint Explorer",
-          "icon": "media/icons/logo-white.svg"
+          "icon": "media/icons/logo-outline.svg"
         }
       ]
     },
