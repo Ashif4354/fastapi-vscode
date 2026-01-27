@@ -13,6 +13,12 @@ import { routerNodeToAppDefinition } from "./core/transformer"
 import type { AppDefinition } from "./core/types"
 import { vscodeFileSystem } from "./providers/vscodeFileSystem"
 import { log } from "./utils/logger"
+import {
+  countRouters,
+  countRoutes,
+  createTimer,
+  trackEntrypointDetected,
+} from "./utils/telemetry"
 
 export type { EntryPoint }
 
@@ -105,6 +111,9 @@ export async function discoverFastAPIApps(
   const apps: AppDefinition[] = []
 
   for (const folder of workspaceFolders) {
+    const folderTimer = createTimer()
+    let detectionMethod: "config" | "pyproject" | "heuristic" = "heuristic"
+    const folderApps: AppDefinition[] = []
     const config = vscode.workspace.getConfiguration("fastapi", folder.uri)
     const customEntryPoint = config.get<string>("entryPoint")
 
@@ -126,14 +135,17 @@ export async function discoverFastAPIApps(
 
       log(`Using custom entry point: ${customEntryPoint}`)
       candidates = [{ filePath: entryUri.toString() }]
+      detectionMethod = "config"
     } else {
       // Otherwise, check pyproject.toml or auto-detect
       const pyprojectEntry = await parsePyprojectForEntryPoint(folder.uri)
       if (pyprojectEntry) {
         candidates = [pyprojectEntry]
+        detectionMethod = "pyproject"
       } else {
         const detected = await automaticDetectEntryPoints(folder)
         candidates = detected.map((filePath) => ({ filePath }))
+        detectionMethod = "heuristic"
         log(
           `Found ${candidates.length} candidate entry file(s) in ${folder.name}`,
         )
@@ -174,10 +186,20 @@ export async function discoverFastAPIApps(
         log(
           `Found FastAPI app "${app.name}" with ${totalRoutes} route(s) in ${app.routers.length} router(s)`,
         )
+        folderApps.push(app)
         apps.push(app)
-        break
+        break // TODO: Only use first successful app per workspace folder, for now
       }
     }
+
+    // Track entrypoint detection per workspace folder
+    trackEntrypointDetected({
+      duration_ms: folderTimer(),
+      method: detectionMethod,
+      success: folderApps.length > 0,
+      routes_count: countRoutes(folderApps),
+      routers_count: countRouters(folderApps),
+    })
   }
 
   if (apps.length === 0) {
