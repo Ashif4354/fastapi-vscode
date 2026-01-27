@@ -1,5 +1,5 @@
 import * as vscode from "vscode"
-import { AuthService } from "./auth"
+import type { AuthService } from "./auth"
 import type { App, Deployment, ListResponse, Team } from "./types"
 
 export interface UploadInfo {
@@ -15,31 +15,20 @@ function getExtensionVersion(): string {
 }
 
 export class ApiService {
-  private static instance: ApiService
-  private static authService: AuthService
   public static readonly BASE_URL = "https://api.fastapicloud.com/api/v1"
   public static readonly DASHBOARD_URL = "https://dashboard.fastapicloud.com"
 
+  constructor(private authService: AuthService) {}
+
   static getDashboardUrl(teamSlug: string, appSlug: string): string {
     return `${ApiService.DASHBOARD_URL}/${teamSlug}/apps/${appSlug}/general`
-  }
-
-  private constructor() {
-    ApiService.authService = AuthService.getInstance()
-  }
-
-  static getInstance(): ApiService {
-    if (!ApiService.instance) {
-      ApiService.instance = new ApiService()
-    }
-    return ApiService.instance
   }
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
   ): Promise<T> {
-    const token = await ApiService.authService.getToken()
+    const token = await this.authService.getToken()
     if (!token) {
       throw new Error("Not authenticated")
     }

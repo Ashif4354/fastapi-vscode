@@ -4,8 +4,10 @@
 
 import * as vscode from "vscode"
 import { discoverFastAPIApps } from "./appDiscovery"
-import { linkApp } from "./cloud/commands/link"
-import { CloudStatusBar } from "./cloud/statusBar"
+import { ApiService } from "./cloud/api"
+import { AuthService } from "./cloud/auth"
+import { CloudController } from "./cloud/cloudController"
+import { ConfigService } from "./cloud/config"
 import { clearImportCache } from "./core/importResolver"
 import { Parser } from "./core/parser"
 import { stripLeadingDynamicSegments } from "./core/pathUtils"
@@ -193,10 +195,17 @@ export async function activate(context: vscode.ExtensionContext) {
     .getConfiguration("fastapi")
     .get<boolean>("cloud.enabled", true)
 
-  const cloudStatusBar = new CloudStatusBar()
+  const authService = new AuthService()
+  const configService = new ConfigService()
+  const apiService = new ApiService(authService)
+  const cloudController = new CloudController(
+    authService,
+    configService,
+    apiService,
+  )
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri
   if (cloudEnabled && workspaceRoot) {
-    cloudStatusBar.initialize(workspaceRoot)
+    cloudController.initialize(workspaceRoot)
   }
 
   // Watch for cloud.enabled setting changes
@@ -221,11 +230,13 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     watcher,
     treeView,
-    { dispose: () => cloudStatusBar.dispose() },
+    { dispose: () => authService.dispose() },
+    { dispose: () => configService.dispose() },
+    { dispose: () => cloudController.dispose() },
     registerCommands(
       endpointProvider,
       codeLensProvider,
-      cloudStatusBar,
+      cloudController,
       groupApps,
     ),
     { dispose: () => clearInterval(telemetryFlushInterval) },
@@ -256,7 +267,7 @@ async function checkCloudEnabled(): Promise<boolean> {
 function registerCommands(
   endpointProvider: EndpointTreeProvider,
   codeLensProvider: TestCodeLensProvider,
-  cloudStatusBar: CloudStatusBar,
+  cloudController: CloudController,
   groupApps: (
     apps: AppDefinition[],
   ) => Array<
@@ -359,27 +370,22 @@ function registerCommands(
     }),
 
     vscode.commands.registerCommand("fastapi-vscode.cloudMenu", () => {
-      cloudStatusBar.showMenu()
+      cloudController.showMenu()
     }),
 
     vscode.commands.registerCommand("fastapi-vscode.linkApp", async () => {
       if (!(await checkCloudEnabled())) return
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri
-      if (!workspaceRoot) {
-        vscode.window.showErrorMessage("No workspace folder open")
-        return
-      }
-      linkApp(workspaceRoot)
+      cloudController.linkProject()
     }),
 
     vscode.commands.registerCommand("fastapi-vscode.unlinkApp", async () => {
       if (!(await checkCloudEnabled())) return
-      cloudStatusBar.unlinkProject()
+      cloudController.unlinkProject()
     }),
 
     vscode.commands.registerCommand("fastapi-vscode.deploy", async () => {
       if (!(await checkCloudEnabled())) return
-      cloudStatusBar.runDeploy()
+      cloudController.runDeploy()
     }),
 
     vscode.commands.registerCommand("fastapi-vscode.signIn", async () => {
@@ -395,7 +401,7 @@ function registerCommands(
 
     vscode.commands.registerCommand("fastapi-vscode.signOut", async () => {
       if (!(await checkCloudEnabled())) return
-      cloudStatusBar.signOut()
+      cloudController.signOut()
     }),
 
     vscode.commands.registerCommand(

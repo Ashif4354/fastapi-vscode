@@ -3,35 +3,34 @@ import {
   trackCloudAppOpened,
   trackCloudDashboardOpened,
   trackCloudLogsViewed,
+  trackCloudProjectLinked,
   trackCloudProjectUnlinked,
   trackCloudSignOut,
 } from "../utils/telemetry"
 import { ApiService } from "./api"
-import { AuthService } from "./auth"
+import type { AuthService } from "./auth"
 import { deploy } from "./commands/deploy"
-import { ConfigService } from "./config"
+import type { ConfigService } from "./config"
+import { pickExistingApp, pickTeam } from "./pickers"
 import type { App, Team } from "./types"
 
-export class CloudStatusBar {
+export class CloudController {
   private statusBarItem: vscode.StatusBarItem
-  private authService: AuthService
-  private configService: ConfigService
-  private apiService: ApiService
   private currentApp: App | null = null
   private currentTeam: Team | null = null
   private workspaceRoot: vscode.Uri | null = null
 
-  constructor() {
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+    private apiService: ApiService,
+  ) {
     this.statusBarItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Left,
       100,
     )
 
     this.statusBarItem.command = "fastapi-vscode.cloudMenu"
-
-    this.authService = AuthService.getInstance()
-    this.configService = ConfigService.getInstance()
-    this.apiService = ApiService.getInstance()
   }
 
   async initialize(workspaceRoot: vscode.Uri) {
@@ -178,7 +177,35 @@ export class CloudStatusBar {
       vscode.window.showErrorMessage("No workspace folder open")
       return
     }
-    await deploy(this.workspaceRoot, this.statusBarItem)
+    await deploy(
+      this.workspaceRoot,
+      this.authService,
+      this.configService,
+      this.apiService,
+      this.statusBarItem,
+    )
+    await this.refresh()
+  }
+
+  async linkProject() {
+    if (!this.workspaceRoot) {
+      vscode.window.showErrorMessage("No workspace folder open")
+      return
+    }
+
+    const team = await pickTeam(this.apiService)
+    if (!team) return
+
+    const app = await pickExistingApp(this.apiService, team)
+    if (!app) return
+
+    await this.configService.writeConfig(this.workspaceRoot, {
+      app_id: app.id,
+      team_id: team.id,
+    })
+
+    trackCloudProjectLinked()
+    vscode.window.showInformationMessage(`Linked to ${app.slug}`)
     await this.refresh()
   }
 

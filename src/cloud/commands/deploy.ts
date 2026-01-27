@@ -5,14 +5,14 @@ import {
   trackCloudAppOpened,
   trackCloudDashboardOpened,
 } from "../../utils/telemetry"
-import { ApiService } from "../api"
-import { AuthService } from "../auth"
-import { ConfigService } from "../config"
+import type { ApiService } from "../api"
+import type { AuthService } from "../auth"
+import type { ConfigService } from "../config"
 import { pickOrCreateApp } from "../pickers"
 import { type Deployment, DeploymentStatus } from "../types"
 
 // Exclusion patterns - aligned with fastapi-cloud-cli plus VS Code extras
-const EXCLUDE_DIRS = new Set([
+export const EXCLUDE_DIRS = new Set([
   // Core exclusions (same as CLI)
   ".venv",
   "__pycache__",
@@ -37,7 +37,7 @@ const EXCLUDE_FILES = new Set([
   "Thumbs.db",
 ])
 
-function shouldExclude(relativePath: string): boolean {
+export function shouldExclude(relativePath: string): boolean {
   const parts = relativePath.split("/")
   const fileName = parts[parts.length - 1]
 
@@ -57,12 +57,11 @@ function shouldExclude(relativePath: string): boolean {
 
 export async function deploy(
   workspaceRoot: vscode.Uri,
+  authService: AuthService,
+  configService: ConfigService,
+  apiService: ApiService,
   statusBar?: vscode.StatusBarItem,
 ): Promise<boolean> {
-  const authService = AuthService.getInstance()
-  const configService = ConfigService.getInstance()
-  const apiService = ApiService.getInstance()
-
   const updateStatus = (text: string) => {
     if (statusBar) {
       statusBar.text = `$(sync~spin) ${text}`
@@ -221,6 +220,8 @@ async function uploadToS3(
   }
 }
 
+const MAX_POLL_ATTEMPTS = 300 // 10 minutes at 2 second intervals
+
 async function pollDeploymentStatus(
   apiService: ApiService,
   appId: string,
@@ -245,7 +246,7 @@ async function pollDeploymentStatus(
     [DeploymentStatus.verifying]: "Verifying...",
   }
 
-  while (true) {
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     const deployment = await apiService.getDeployment(appId, deploymentId)
 
     if (
@@ -266,4 +267,7 @@ async function pollDeploymentStatus(
     // Wait before polling again
     await new Promise((resolve) => setTimeout(resolve, 2000))
   }
+
+  // Timeout
+  return null
 }

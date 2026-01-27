@@ -16,15 +16,12 @@ That's why there's a ".gitignore" file in this folder.
 `
 
 export class ConfigService {
-  public static instance: ConfigService
   private static CONFIG_DIR = ".fastapicloud"
   private static CONFIG_FILE = "cloud.json"
   private fileWatcher?: vscode.FileSystemWatcher
 
   private _onConfigStateChanged = new vscode.EventEmitter<Config | null>()
   readonly onConfigStateChanged = this._onConfigStateChanged.event
-
-  private constructor() {}
 
   startWatching(workspaceRoot: vscode.Uri) {
     const pattern = new vscode.RelativePattern(
@@ -41,13 +38,6 @@ export class ConfigService {
       this._onConfigStateChanged.fire(config)
     })
     this.fileWatcher.onDidDelete(() => this._onConfigStateChanged.fire(null))
-  }
-
-  static getInstance(): ConfigService {
-    if (!ConfigService.instance) {
-      ConfigService.instance = new ConfigService()
-    }
-    return ConfigService.instance
   }
 
   async getConfig(workspaceRoot: vscode.Uri): Promise<Config | null> {

@@ -5,16 +5,36 @@ interface AuthConfig {
   access_token: string
 }
 
+/** Check if a JWT token is expired. Exported for testing. */
+export function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split(".")
+    if (parts.length !== 3) return true
+
+    let payload = parts[1]
+    // Add padding if needed (JWT uses base64url encoding without padding)
+    const padding = payload.length % 4
+    if (padding) {
+      payload += "=".repeat(4 - padding)
+    }
+    // Convert base64url to base64
+    payload = payload.replace(/-/g, "+").replace(/_/g, "/")
+
+    const decoded = JSON.parse(Buffer.from(payload, "base64").toString())
+    if (decoded.exp === undefined) return false
+    return Date.now() >= decoded.exp * 1000
+  } catch {
+    return true
+  }
+}
+
 export class AuthService {
-  public static instance: AuthService
   private authUri: vscode.Uri | null = null
   private lastAuthState = false
   private pollingInterval?: ReturnType<typeof setInterval>
 
   private _onAuthStateChanged = new vscode.EventEmitter<boolean>()
   readonly onAuthStateChanged = this._onAuthStateChanged.event
-
-  private constructor() {}
 
   startWatching() {
     // Poll for auth changes since we can't use fs.watch in browser
@@ -32,13 +52,6 @@ export class AuthService {
       this.lastAuthState = loggedIn
       this._onAuthStateChanged.fire(loggedIn)
     }
-  }
-
-  static getInstance(): AuthService {
-    if (!AuthService.instance) {
-      AuthService.instance = new AuthService()
-    }
-    return AuthService.instance
   }
 
   private getAuthUri(): vscode.Uri | null {
@@ -90,29 +103,7 @@ export class AuthService {
     if (!token) {
       return false
     }
-    return !this.isTokenExpired(token)
-  }
-
-  private isTokenExpired(token: string): boolean {
-    try {
-      const parts = token.split(".")
-      if (parts.length !== 3) return true
-
-      let payload = parts[1]
-      // Add padding if needed (JWT uses base64url encoding without padding)
-      const padding = payload.length % 4
-      if (padding) {
-        payload += "=".repeat(4 - padding)
-      }
-      // Convert base64url to base64
-      payload = payload.replace(/-/g, "+").replace(/_/g, "/")
-
-      const decoded = JSON.parse(Buffer.from(payload, "base64").toString())
-      if (decoded.exp === undefined) return false
-      return Date.now() >= decoded.exp * 1000
-    } catch {
-      return true
-    }
+    return !isTokenExpired(token)
   }
 
   async refresh(): Promise<boolean> {
