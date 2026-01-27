@@ -88,6 +88,8 @@ async function main() {
       "posthog-node",
       "util",
       "child_process",
+      "node:util",
+      "node:child_process",
     ],
   })
 

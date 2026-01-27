@@ -1,4 +1,5 @@
 import * as vscode from "vscode"
+import { trackCloudProjectLinked } from "../../utils/telemetry"
 import { ApiService } from "../api"
 import { ConfigService } from "../config"
 import { pickExistingApp, pickTeam } from "../pickers"
@@ -18,6 +19,7 @@ export async function linkApp(workspaceRoot: vscode.Uri): Promise<boolean> {
     team_id: team.id,
   })
 
+  trackCloudProjectLinked()
   vscode.window.showInformationMessage(`Linked to ${app.slug}`)
   return true
 }

@@ -1,4 +1,11 @@
 import * as vscode from "vscode"
+import {
+  trackCloudAppOpened,
+  trackCloudDashboardOpened,
+  trackCloudLogsViewed,
+  trackCloudProjectUnlinked,
+  trackCloudSignOut,
+} from "../utils/telemetry"
 import { ApiService } from "./api"
 import { AuthService } from "./auth"
 import { deploy } from "./commands/deploy"
@@ -144,15 +151,18 @@ export class CloudStatusBar {
           case "open":
             if (this.currentApp?.url) {
               vscode.env.openExternal(vscode.Uri.parse(this.currentApp.url))
+              trackCloudAppOpened()
             }
             break
           case "dashboard":
             if (dashboardUrl) {
               vscode.env.openExternal(vscode.Uri.parse(dashboardUrl))
+              trackCloudDashboardOpened()
             }
             break
           case "logs":
             // TODO: Implement logs view in VS Code
+            trackCloudLogsViewed()
             vscode.window.showInformationMessage("Logs view coming soon")
             break
           case "more":
@@ -209,6 +219,7 @@ export class CloudStatusBar {
 
     if (confirm === "Sign Out") {
       await this.authService.signOut()
+      trackCloudSignOut()
       this.currentApp = null
       this.currentTeam = null
       await this.refresh()
@@ -228,6 +239,7 @@ export class CloudStatusBar {
 
     if (confirm === "Unlink") {
       await this.configService.deleteConfig(this.workspaceRoot)
+      trackCloudProjectUnlinked()
       this.currentApp = null
       this.currentTeam = null
       await this.refresh()

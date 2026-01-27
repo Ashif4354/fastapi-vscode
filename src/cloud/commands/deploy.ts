@@ -1,6 +1,10 @@
 // @ts-expect-error - tinytar has no type definitions
 import { tar } from "tinytar"
 import * as vscode from "vscode"
+import {
+  trackCloudAppOpened,
+  trackCloudDashboardOpened,
+} from "../../utils/telemetry"
 import { ApiService } from "../api"
 import { AuthService } from "../auth"
 import { ConfigService } from "../config"
@@ -134,8 +138,10 @@ export async function deploy(
 
       if (action === "Open App" && finalDeployment.url) {
         vscode.env.openExternal(vscode.Uri.parse(finalDeployment.url))
+        trackCloudAppOpened()
       } else if (action === "View Dashboard" && finalDeployment.dashboard_url) {
         vscode.env.openExternal(vscode.Uri.parse(finalDeployment.dashboard_url))
+        trackCloudDashboardOpened()
       }
       return true
     }

@@ -1,4 +1,5 @@
 import * as vscode from "vscode"
+import { trackCloudSignIn } from "../utils/telemetry"
 
 interface AuthConfig {
   access_token: string
@@ -24,6 +25,10 @@ export class AuthService {
   private async checkAndFireAuthState() {
     const loggedIn = await this.isLoggedIn()
     if (loggedIn !== this.lastAuthState) {
+      // Track sign in when transitioning from logged out to logged in
+      if (loggedIn && !this.lastAuthState) {
+        trackCloudSignIn()
+      }
       this.lastAuthState = loggedIn
       this._onAuthStateChanged.fire(loggedIn)
     }
