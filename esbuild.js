@@ -5,6 +5,8 @@ import esbuild from "esbuild"
 const production = process.argv.includes("--production")
 const watch = process.argv.includes("--watch")
 
+const POSTHOG_API_KEY = "phc_s0Qx8NxueJvnqe4YE7NEKYNosJr8aZ81tIByuzm464X"
+
 function copyWasmFiles() {
   const wasmDestDir = path.join(import.meta.dirname, "dist", "wasm")
   mkdirSync(wasmDestDir, { recursive: true })
@@ -44,6 +46,9 @@ async function main() {
     logLevel: "info",
     define: {
       "process.env.NODE_ENV": production ? '"production"' : '"development"',
+      "process.env.POSTHOG_API_KEY": production
+        ? JSON.stringify(POSTHOG_API_KEY)
+        : '""',
       __DIST_ROOT__: JSON.stringify(path.join(import.meta.dirname, "dist")),
     },
   }
@@ -74,7 +79,16 @@ async function main() {
     },
     // vscode is provided by the runtime; web-tree-sitter is bundled but
     // internally references these Node.js modules for environment detection
-    external: ["vscode", "fs/promises", "module"],
+    // posthog-node uses Node.js APIs, so telemetry is disabled in browser
+    // util and child_process are used for version detection but not in browser
+    external: [
+      "vscode",
+      "fs/promises",
+      "module",
+      "posthog-node",
+      "util",
+      "child_process",
+    ],
   })
 
   if (watch) {
