@@ -4,6 +4,8 @@
 
 import * as vscode from "vscode"
 import { discoverFastAPIApps } from "./appDiscovery"
+import { linkApp } from "./cloud/commands/link"
+import { CloudStatusBar } from "./cloud/statusBar"
 import { clearImportCache } from "./core/importResolver"
 import { Parser } from "./core/parser"
 import { stripLeadingDynamicSegments } from "./core/pathUtils"
@@ -128,17 +130,66 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   }
 
+  // Cloud status bar (if enabled)
+  const cloudEnabled = vscode.workspace
+    .getConfiguration("fastapi")
+    .get<boolean>("cloud.enabled", true)
+
+  const cloudStatusBar = new CloudStatusBar()
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri
+  if (cloudEnabled && workspaceRoot) {
+    cloudStatusBar.initialize(workspaceRoot)
+  }
+
+  // Watch for cloud.enabled setting changes
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (e.affectsConfiguration("fastapi.cloud.enabled")) {
+        const action = await vscode.window.showWarningMessage(
+          "FastAPI Cloud setting changed. Reload the window to apply changes.",
+          "Reload Window",
+        )
+        if (action === "Reload Window") {
+          vscode.commands.executeCommand("workbench.action.reloadWindow")
+        }
+      }
+    }),
+  )
+
   // Register disposables and commands
   context.subscriptions.push(
     watcher,
     treeView,
-    registerCommands(endpointProvider, codeLensProvider),
+    { dispose: () => cloudStatusBar.dispose() },
+    registerCommands(endpointProvider, codeLensProvider, cloudStatusBar),
   )
+}
+
+async function checkCloudEnabled(): Promise<boolean> {
+  const enabled = vscode.workspace
+    .getConfiguration("fastapi")
+    .get<boolean>("cloud.enabled", true)
+
+  if (!enabled) {
+    const action = await vscode.window.showWarningMessage(
+      "FastAPI Cloud is disabled. Enable it in settings and reload the window.",
+      "Enable & Reload",
+    )
+    if (action === "Enable & Reload") {
+      await vscode.workspace
+        .getConfiguration("fastapi")
+        .update("cloud.enabled", true, vscode.ConfigurationTarget.Global)
+      vscode.commands.executeCommand("workbench.action.reloadWindow")
+    }
+    return false
+  }
+  return true
 }
 
 function registerCommands(
   endpointProvider: EndpointTreeProvider,
   codeLensProvider: TestCodeLensProvider,
+  cloudStatusBar: CloudStatusBar,
 ): vscode.Disposable {
   return vscode.Disposable.from(
     vscode.commands.registerCommand(
@@ -228,6 +279,46 @@ function registerCommands(
 
     vscode.commands.registerCommand("fastapi-vscode.toggleRouters", () => {
       endpointProvider.toggleRouters()
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.cloudMenu", () => {
+      cloudStatusBar.showMenu()
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.linkApp", async () => {
+      if (!(await checkCloudEnabled())) return
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri
+      if (!workspaceRoot) {
+        vscode.window.showErrorMessage("No workspace folder open")
+        return
+      }
+      linkApp(workspaceRoot)
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.unlinkApp", async () => {
+      if (!(await checkCloudEnabled())) return
+      cloudStatusBar.unlinkProject()
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.deploy", async () => {
+      if (!(await checkCloudEnabled())) return
+      cloudStatusBar.runDeploy()
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.signIn", async () => {
+      // For now, prompt user to use CLI. OAuth flow will be added later.
+      const action = await vscode.window.showInformationMessage(
+        "To sign in, run 'fastapi auth login' in your terminal.",
+        "Open Terminal",
+      )
+      if (action === "Open Terminal") {
+        vscode.commands.executeCommand("workbench.action.terminal.new")
+      }
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.signOut", async () => {
+      if (!(await checkCloudEnabled())) return
+      cloudStatusBar.signOut()
     }),
 
     vscode.commands.registerCommand(
