@@ -1,6 +1,8 @@
 import * as vscode from "vscode"
 import { trackCloudSignIn } from "../utils/telemetry"
 
+const AUTH_POLL_INTERVAL_MS = 3000
+
 interface AuthConfig {
   access_token: string
 }
@@ -11,16 +13,8 @@ export function isTokenExpired(token: string): boolean {
     const parts = token.split(".")
     if (parts.length !== 3) return true
 
-    let payload = parts[1]
-    // Add padding if needed (JWT uses base64url encoding without padding)
-    const padding = payload.length % 4
-    if (padding) {
-      payload += "=".repeat(4 - padding)
-    }
-    // Convert base64url to base64
-    payload = payload.replace(/-/g, "+").replace(/_/g, "/")
+    const decoded = JSON.parse(Buffer.from(parts[1], "base64url").toString())
 
-    const decoded = JSON.parse(Buffer.from(payload, "base64").toString())
     if (decoded.exp === undefined) return false
     return Date.now() >= decoded.exp * 1000
   } catch {
@@ -39,7 +33,10 @@ export class AuthService {
   startWatching() {
     // Poll for auth changes since we can't use fs.watch in browser
     // and VS Code's file watcher doesn't work for files outside workspace
-    this.pollingInterval = setInterval(() => this.checkAndFireAuthState(), 3000)
+    this.pollingInterval = setInterval(
+      () => this.checkAndFireAuthState(),
+      AUTH_POLL_INTERVAL_MS,
+    )
   }
 
   private async checkAndFireAuthState() {

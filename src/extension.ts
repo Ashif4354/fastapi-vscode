@@ -195,17 +195,24 @@ export async function activate(context: vscode.ExtensionContext) {
     .getConfiguration("fastapi")
     .get<boolean>("cloud.enabled", true)
 
-  const authService = new AuthService()
-  const configService = new ConfigService()
-  const apiService = new ApiService(authService)
-  const cloudController = new CloudController(
-    authService,
-    configService,
-    apiService,
-  )
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri
   if (cloudEnabled && workspaceRoot) {
+    const authService = new AuthService()
+    const configService = new ConfigService()
+    const apiService = new ApiService(authService)
+    const cloudController = new CloudController(
+      authService,
+      configService,
+      apiService,
+    )
     cloudController.initialize(workspaceRoot)
+
+    context.subscriptions.push(
+      { dispose: () => authService.dispose() },
+      { dispose: () => configService.dispose() },
+      { dispose: () => cloudController.dispose() },
+      registerCloudCommands(cloudController),
+    )
   }
 
   // Watch for cloud.enabled setting changes
@@ -230,44 +237,50 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     watcher,
     treeView,
-    { dispose: () => authService.dispose() },
-    { dispose: () => configService.dispose() },
-    { dispose: () => cloudController.dispose() },
-    registerCommands(
-      endpointProvider,
-      codeLensProvider,
-      cloudController,
-      groupApps,
-    ),
+    registerCommands(endpointProvider, codeLensProvider, groupApps),
     { dispose: () => clearInterval(telemetryFlushInterval) },
   )
 }
 
-async function checkCloudEnabled(): Promise<boolean> {
-  const enabled = vscode.workspace
-    .getConfiguration("fastapi")
-    .get<boolean>("cloud.enabled", true)
+function registerCloudCommands(
+  cloudController: CloudController,
+): vscode.Disposable {
+  return vscode.Disposable.from(
+    vscode.commands.registerCommand("fastapi-vscode.cloudMenu", async () => {
+      await cloudController.showMenu()
+    }),
 
-  if (!enabled) {
-    const action = await vscode.window.showWarningMessage(
-      "FastAPI Cloud is disabled. Enable it in settings and reload the window.",
-      "Enable & Reload",
-    )
-    if (action === "Enable & Reload") {
-      await vscode.workspace
-        .getConfiguration("fastapi")
-        .update("cloud.enabled", true, vscode.ConfigurationTarget.Global)
-      vscode.commands.executeCommand("workbench.action.reloadWindow")
-    }
-    return false
-  }
-  return true
+    vscode.commands.registerCommand("fastapi-vscode.linkApp", async () => {
+      await cloudController.linkProject()
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.unlinkApp", async () => {
+      await cloudController.unlinkProject()
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.deploy", async () => {
+      await cloudController.runDeploy()
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.signIn", async () => {
+      const action = await vscode.window.showInformationMessage(
+        "To sign in, run 'fastapi auth login' in your terminal.",
+        "Open Terminal",
+      )
+      if (action === "Open Terminal") {
+        vscode.commands.executeCommand("workbench.action.terminal.new")
+      }
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.signOut", async () => {
+      await cloudController.signOut()
+    }),
+  )
 }
 
 function registerCommands(
   endpointProvider: EndpointTreeProvider,
   codeLensProvider: TestCodeLensProvider,
-  cloudController: CloudController,
   groupApps: (
     apps: AppDefinition[],
   ) => Array<
@@ -367,41 +380,6 @@ function registerCommands(
 
     vscode.commands.registerCommand("fastapi-vscode.toggleRouters", () => {
       endpointProvider.toggleRouters()
-    }),
-
-    vscode.commands.registerCommand("fastapi-vscode.cloudMenu", () => {
-      cloudController.showMenu()
-    }),
-
-    vscode.commands.registerCommand("fastapi-vscode.linkApp", async () => {
-      if (!(await checkCloudEnabled())) return
-      cloudController.linkProject()
-    }),
-
-    vscode.commands.registerCommand("fastapi-vscode.unlinkApp", async () => {
-      if (!(await checkCloudEnabled())) return
-      cloudController.unlinkProject()
-    }),
-
-    vscode.commands.registerCommand("fastapi-vscode.deploy", async () => {
-      if (!(await checkCloudEnabled())) return
-      cloudController.runDeploy()
-    }),
-
-    vscode.commands.registerCommand("fastapi-vscode.signIn", async () => {
-      // For now, prompt user to use CLI. OAuth flow will be added later.
-      const action = await vscode.window.showInformationMessage(
-        "To sign in, run 'fastapi auth login' in your terminal.",
-        "Open Terminal",
-      )
-      if (action === "Open Terminal") {
-        vscode.commands.executeCommand("workbench.action.terminal.new")
-      }
-    }),
-
-    vscode.commands.registerCommand("fastapi-vscode.signOut", async () => {
-      if (!(await checkCloudEnabled())) return
-      cloudController.signOut()
     }),
 
     vscode.commands.registerCommand(

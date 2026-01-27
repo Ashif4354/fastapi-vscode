@@ -37,6 +37,10 @@ const EXCLUDE_FILES = new Set([
   "Thumbs.db",
 ])
 
+// 300 attempts x 2 seconds = 10 minutes maximum
+const MAX_POLL_ATTEMPTS = 300
+const DEPLOYMENT_POLL_INTERVAL_MS = 2000
+
 export function shouldExclude(relativePath: string): boolean {
   const parts = relativePath.split("/")
   const fileName = parts[parts.length - 1]
@@ -220,8 +224,6 @@ async function uploadToS3(
   }
 }
 
-const MAX_POLL_ATTEMPTS = 300 // 10 minutes at 2 second intervals
-
 async function pollDeploymentStatus(
   apiService: ApiService,
   appId: string,
@@ -265,7 +267,9 @@ async function pollDeploymentStatus(
     updateStatus(message)
 
     // Wait before polling again
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await new Promise((resolve) =>
+      setTimeout(resolve, DEPLOYMENT_POLL_INTERVAL_MS),
+    )
   }
 
   // Timeout

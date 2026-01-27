@@ -19,6 +19,7 @@ export class CloudController {
   private currentApp: App | null = null
   private currentTeam: Team | null = null
   private workspaceRoot: vscode.Uri | null = null
+  private refreshing = false
 
   constructor(
     private authService: AuthService,
@@ -46,30 +47,36 @@ export class CloudController {
   }
 
   async refresh() {
-    const isLoggedIn = await this.authService.isLoggedIn()
-    if (!isLoggedIn) {
-      this.statusBarItem.text = "$(cloud) Sign in to FastAPI Cloud"
-      return
-    }
-
-    if (this.workspaceRoot) {
-      const config = await this.configService.getConfig(this.workspaceRoot)
-
-      if (!config) {
-        this.statusBarItem.text = "$(cloud) Deploy to FastAPI Cloud"
+    if (this.refreshing) return
+    this.refreshing = true
+    try {
+      const isLoggedIn = await this.authService.isLoggedIn()
+      if (!isLoggedIn) {
+        this.statusBarItem.text = "$(cloud) Sign in to FastAPI Cloud"
         return
       }
 
-      try {
-        this.currentApp = await this.apiService.getApp(config.app_id)
-        this.currentTeam = await this.apiService.getTeam(config.team_id)
+      if (this.workspaceRoot) {
+        const config = await this.configService.getConfig(this.workspaceRoot)
 
-        if (this.currentApp) {
-          this.statusBarItem.text = `$(cloud) ${this.currentApp.slug}`
+        if (!config) {
+          this.statusBarItem.text = "$(cloud) Deploy to FastAPI Cloud"
+          return
         }
-      } catch {
-        this.statusBarItem.text = "$(cloud) Deploy to FastAPI Cloud"
+
+        try {
+          this.currentApp = await this.apiService.getApp(config.app_id)
+          this.currentTeam = await this.apiService.getTeam(config.team_id)
+
+          if (this.currentApp) {
+            this.statusBarItem.text = `$(cloud) ${this.currentApp.slug}`
+          }
+        } catch {
+          this.statusBarItem.text = "$(cloud) Deploy to FastAPI Cloud"
+        }
       }
+    } finally {
+      this.refreshing = false
     }
   }
 
