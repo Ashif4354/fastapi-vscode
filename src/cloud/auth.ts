@@ -1,7 +1,9 @@
 import * as vscode from "vscode"
 import { trackCloudSignIn } from "../utils/telemetry"
+import { ApiService } from "./api"
 
 const AUTH_POLL_INTERVAL_MS = 3000
+const CLIENT_ID = "fastapi-vscode"
 
 interface AuthConfig {
   access_token: string
@@ -116,13 +118,45 @@ export class AuthService {
       return true
     }
 
-    // Else, do OAuth flow here (TODO)
-    // - Open browser
-    // - Register URI handler for vscode://fastapi.fastapi-cloud/callback
-    // - Exchange code for token
-    // - Call saveToken() to write to shared location
+    try {
+      const deviceCodeResponse = await ApiService.requestDeviceCode(CLIENT_ID)
+      // Show instructions to user
+      const verificationUri =
+        deviceCodeResponse.verification_uri_complete ||
+        `${deviceCodeResponse.verification_uri}?user_code=${deviceCodeResponse.user_code}`
+      vscode.env.openExternal(vscode.Uri.parse(verificationUri))
 
-    return false
+      const intervalMs = (deviceCodeResponse.interval ?? 5) * 1000
+
+      return await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Signing in to FastAPI Cloud...",
+          cancellable: true,
+        },
+        async (_progress, cancellationToken) => {
+          const abortController = new AbortController()
+          cancellationToken.onCancellationRequested(() =>
+            abortController.abort(),
+          )
+
+          const token = await ApiService.pollDeviceToken(
+            CLIENT_ID,
+            deviceCodeResponse.device_code,
+            intervalMs,
+            abortController.signal,
+          )
+
+          await this.saveToken(token)
+          return true
+        },
+      )
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Sign-in failed: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      return false
+    }
   }
 
   async saveToken(token: string): Promise<void> {

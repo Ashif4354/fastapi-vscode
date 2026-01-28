@@ -105,4 +105,100 @@ export class ApiService {
       `/apps/${appId}/deployments/${deploymentId}/`,
     )
   }
+
+  static async requestDeviceCode(clientId: string): Promise<{
+    device_code: string
+    user_code: string
+    verification_uri: string
+    verification_uri_complete?: string
+    expires_in?: number
+    interval?: number
+  }> {
+    const response = await fetch(
+      `${ApiService.BASE_URL}/login/device/authorization`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": `fastapi-vscode/${getExtensionVersion()}`,
+        },
+        body: new URLSearchParams({ client_id: clientId }).toString(),
+      },
+    )
+
+    if (!response.ok) {
+      throw new Error(
+        `Device code request failed: ${response.status} ${response.statusText}`,
+      )
+    }
+
+    const data = (await response.json()) as {
+      device_code?: string
+      user_code?: string
+      verification_uri?: string
+      verification_uri_complete?: string
+      expires_in?: number
+      interval?: number
+    }
+
+    if (!data.device_code || !data.user_code || !data.verification_uri) {
+      throw new Error("Invalid response from device code endpoint")
+    }
+    return {
+      device_code: data.device_code,
+      user_code: data.user_code,
+      verification_uri: data.verification_uri,
+      verification_uri_complete: data.verification_uri_complete ?? "",
+      expires_in: data.expires_in ?? 0,
+      interval: data.interval ?? 0,
+    }
+  }
+
+  static async pollDeviceToken(
+    clientId: string,
+    deviceCode: string,
+    intervalMs = 5000,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    while (true) {
+      if (signal?.aborted) {
+        throw new Error("Sign-in cancelled")
+      }
+
+      const response = await fetch(
+        `${ApiService.BASE_URL}/login/device/token`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": `fastapi-vscode/${getExtensionVersion()}`,
+          },
+          body: new URLSearchParams({
+            client_id: clientId,
+            device_code: deviceCode,
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+          }).toString(),
+          signal,
+        },
+      )
+
+      const data = (await response.json()) as {
+        access_token?: string
+        error?: string
+      }
+
+      if (response.ok && data.access_token) {
+        return data.access_token
+      }
+      if (data.error === "authorization_pending") {
+        await new Promise((resolve) => setTimeout(resolve, intervalMs))
+      } else if (data.error === "expired_token") {
+        throw new Error("Device code has expired")
+      } else {
+        throw new Error(
+          `Device token request failed: ${data.error || response.statusText}`,
+        )
+      }
+    }
+  }
 }

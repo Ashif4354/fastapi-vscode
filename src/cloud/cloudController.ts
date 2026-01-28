@@ -83,14 +83,7 @@ export class CloudController {
   async showMenu() {
     const isLoggedIn = await this.authService.isLoggedIn()
     if (!isLoggedIn) {
-      const result = await vscode.window.showInformationMessage(
-        "To sign in, run 'fastapi auth login' in your terminal.",
-        "Open Terminal",
-      )
-
-      if (result === "Open Terminal") {
-        vscode.commands.executeCommand("workbench.action.terminal.new")
-      }
+      this.authService.signIn()
       return
     }
 
