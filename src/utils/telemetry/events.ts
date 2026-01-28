@@ -1,4 +1,3 @@
-import type { AppDefinition, RouterDefinition } from "../../core/types"
 import { client } from "./client"
 import type {
   ActivationEventProps,
@@ -87,31 +86,6 @@ export function flushSessionSummary(): void {
   }
 }
 
-export function countRoutes(apps: AppDefinition[]): number {
-  const countInRouter = (router: RouterDefinition): number =>
-    router.routes.length +
-    router.children.reduce((sum, child) => sum + countInRouter(child), 0)
-
-  return apps.reduce(
-    (sum, app) =>
-      sum +
-      app.routes.length +
-      app.routers.reduce((sum, router) => sum + countInRouter(router), 0),
-    0,
-  )
-}
-
-export function countRouters(apps: AppDefinition[]): number {
-  const countInRouter = (router: RouterDefinition): number =>
-    1 + router.children.reduce((sum, child) => sum + countInRouter(child), 0)
-
-  return apps.reduce(
-    (sum, app) =>
-      sum + app.routers.reduce((s, router) => s + countInRouter(router), 0),
-    0,
-  )
-}
-
 export function sanitizeError(error: unknown): string {
   if (!(error instanceof Error)) {
     return "unknown_error"
@@ -136,6 +110,7 @@ export function sanitizeError(error: unknown): string {
   return "unknown_error"
 }
 
+/* c8 ignore start -- thin telemetry wrappers, no branching logic worth testing */
 export function trackActivation(props: ActivationEventProps): void {
   client.capture(Events.ACTIVATED, { ...props })
 }
@@ -219,3 +194,4 @@ export function trackCloudAppOpened(): void {
 export function trackCloudLogsViewed(): void {
   client.capture(Events.CLOUD_LOGS_VIEWED)
 }
+/* c8 ignore stop */

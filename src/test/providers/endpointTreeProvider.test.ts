@@ -1,6 +1,134 @@
 import * as assert from "node:assert"
-import { EndpointTreeProvider } from "../../providers/endpointTreeProvider"
-import { mockApps } from "../fixtures/mockEndpointData"
+import type {
+  AppDefinition,
+  RouteDefinition,
+  RouterDefinition,
+} from "../../core/types"
+import {
+  EndpointTreeProvider,
+  getAppLabel,
+  getRouteLabel,
+  getRouterLabel,
+} from "../../providers/endpointTreeProvider"
+import { groupAppsByWorkspace, mockApps } from "../fixtures/mockEndpointData"
+
+function makeRoute(method: string, path: string): RouteDefinition {
+  return {
+    method: method as RouteDefinition["method"],
+    path,
+    functionName: `${method.toLowerCase()}_handler`,
+    location: { filePath: "test.py", line: 1, column: 0 },
+  }
+}
+
+function makeRouter(
+  prefix: string,
+  opts: { tags?: string[]; filePath?: string } = {},
+): RouterDefinition {
+  return {
+    name: "router",
+    prefix,
+    tags: opts.tags ?? [],
+    location: { filePath: opts.filePath ?? "test.py", line: 1, column: 0 },
+    routes: [],
+    children: [],
+  }
+}
+
+function makeApp(name: string, filePath: string): AppDefinition {
+  return {
+    name,
+    filePath,
+    workspaceFolder: "/workspace",
+    routes: [],
+    routers: [],
+  }
+}
+
+suite("getAppLabel", () => {
+  test("uses app name when not generic", () => {
+    assert.strictEqual(
+      getAppLabel(makeApp("myapi", "backend/main.py")),
+      "myapi",
+    )
+  })
+
+  test("uses parent dir when name is 'app'", () => {
+    assert.strictEqual(
+      getAppLabel(makeApp("app", "backend/main.py")),
+      "backend",
+    )
+  })
+
+  test("skips 'src' parent dir", () => {
+    assert.strictEqual(
+      getAppLabel(makeApp("app", "project/src/main.py")),
+      "project/src",
+    )
+  })
+
+  test("skips 'app' parent dir", () => {
+    assert.strictEqual(
+      getAppLabel(makeApp("app", "project/app/main.py")),
+      "project/app",
+    )
+  })
+
+  test("falls back to filename when no parent dirs", () => {
+    assert.strictEqual(getAppLabel(makeApp("app", "main.py")), "main")
+  })
+})
+
+suite("getRouterLabel", () => {
+  test("uses prefix as label", () => {
+    assert.strictEqual(getRouterLabel(makeRouter("/users"), "/"), "/users")
+  })
+
+  test("shows relative path under parent", () => {
+    assert.strictEqual(
+      getRouterLabel(makeRouter("/api/users"), "/api"),
+      "/users",
+    )
+  })
+
+  test("falls back to tag when prefix is /", () => {
+    assert.strictEqual(
+      getRouterLabel(makeRouter("/", { tags: ["users"] }), "/"),
+      "/users",
+    )
+  })
+
+  test("falls back to filename when no prefix or tag", () => {
+    assert.strictEqual(
+      getRouterLabel(makeRouter("/", { filePath: "src/users.py" }), "/"),
+      "users",
+    )
+  })
+
+  test("uses parent dir for generic filenames", () => {
+    assert.strictEqual(
+      getRouterLabel(makeRouter("/", { filePath: "src/users/router.py" }), "/"),
+      "users",
+    )
+  })
+
+  test("uses parent dir for 'routes.py'", () => {
+    assert.strictEqual(
+      getRouterLabel(makeRouter("/", { filePath: "src/items/routes.py" }), "/"),
+      "items",
+    )
+  })
+})
+
+suite("getRouteLabel", () => {
+  test("includes method and path", () => {
+    assert.strictEqual(getRouteLabel(makeRoute("GET", "/users")), "GET /users")
+  })
+
+  test("websocket omits method", () => {
+    assert.strictEqual(getRouteLabel(makeRoute("WEBSOCKET", "/ws")), "/ws")
+  })
+})
 
 suite("EndpointTreeProvider", () => {
   let provider: EndpointTreeProvider
@@ -191,5 +319,131 @@ suite("EndpointTreeProvider", () => {
     const app = roots[0]
     const treeItem = provider.getTreeItem(app)
     assert.strictEqual(treeItem.contextValue, "app")
+  })
+
+  test("getTreeItem for message type", () => {
+    const emptyProvider = new EndpointTreeProvider([])
+    const msg = emptyProvider.getChildren()[0]
+    assert.strictEqual(
+      emptyProvider.getTreeItem(msg).label,
+      "No FastAPI app found",
+    )
+  })
+
+  test("getTreeItem for workspace type", () => {
+    const wsRoots = groupAppsByWorkspace(mockApps)
+    const wsProvider = new EndpointTreeProvider(mockApps, wsRoots)
+    const workspace = wsProvider
+      .getChildren()
+      .find((r) => r.type === "workspace")
+    assert.ok(workspace)
+    assert.strictEqual(
+      wsProvider.getTreeItem(workspace!).contextValue,
+      "workspace",
+    )
+  })
+
+  test("getTreeItem uses parent router prefix for nested router label", () => {
+    const childRouter: RouterDefinition = {
+      name: "child",
+      prefix: "/api/v1/users/settings",
+      tags: [],
+      location: { filePath: "settings.py", line: 1, column: 0 },
+      routes: [],
+      children: [],
+    }
+    const parentRouter: RouterDefinition = {
+      name: "parent",
+      prefix: "/api/v1/users",
+      tags: [],
+      location: { filePath: "users.py", line: 1, column: 0 },
+      routes: [],
+      children: [childRouter],
+    }
+    const app = makeApp("app", "main.py")
+    app.routers = [parentRouter]
+    const p = new EndpointTreeProvider([app])
+    assert.strictEqual(
+      p.getTreeItem({ type: "router", router: childRouter }).label,
+      "/settings",
+    )
+  })
+
+  test("toggleRouters changes router collapsible state", () => {
+    const router = provider
+      .getChildren(provider.getChildren()[0])
+      .find((c) => c.type === "router")
+    assert.ok(router)
+    assert.strictEqual(provider.getTreeItem(router!).collapsibleState, 1)
+    provider.toggleRouters()
+    assert.strictEqual(provider.getTreeItem(router!).collapsibleState, 2)
+  })
+
+  test("dispose cleans up", () => {
+    new EndpointTreeProvider([]).dispose()
+  })
+
+  test("setApps updates apps and refreshes tree", () => {
+    const p = new EndpointTreeProvider([])
+    assert.strictEqual(p.getChildren()[0].type, "message")
+    p.setApps(mockApps)
+    assert.strictEqual(p.getChildren()[0].type, "app")
+  })
+
+  test("getParent returns app for top-level router", () => {
+    const appItem = provider.getChildren()[0]
+    const router = provider
+      .getChildren(appItem)
+      .find((c) => c.type === "router")!
+    assert.strictEqual(provider.getParent(router)?.type, "app")
+  })
+
+  test("getParent returns router for route inside router", () => {
+    const appItem = provider.getChildren()[0]
+    const router = provider
+      .getChildren(appItem)
+      .find((c) => c.type === "router")!
+    const route = provider.getChildren(router).find((c) => c.type === "route")!
+    assert.strictEqual(provider.getParent(route)?.type, "router")
+  })
+
+  test("getParent returns app for direct route", () => {
+    const appItem = provider.getChildren()[0]
+    const route = provider.getChildren(appItem).find((c) => c.type === "route")!
+    assert.strictEqual(provider.getParent(route)?.type, "app")
+  })
+
+  test("getParent returns workspace for app in multi-root", () => {
+    const wsRoots = groupAppsByWorkspace(mockApps)
+    const wsProvider = new EndpointTreeProvider(mockApps, wsRoots)
+    const workspace = wsProvider
+      .getChildren()
+      .find((r) => r.type === "workspace")!
+    const apps = wsProvider.getChildren(workspace)
+    assert.strictEqual(wsProvider.getParent(apps[0])?.type, "workspace")
+  })
+
+  test("getParent returns parent router for nested router", () => {
+    const childRouter: RouterDefinition = {
+      name: "child",
+      prefix: "/nested",
+      tags: [],
+      location: { filePath: "child.py", line: 1, column: 0 },
+      routes: [],
+      children: [],
+    }
+    const parentRouter: RouterDefinition = {
+      name: "parent",
+      prefix: "/api",
+      tags: [],
+      location: { filePath: "parent.py", line: 1, column: 0 },
+      routes: [],
+      children: [childRouter],
+    }
+    const app = makeApp("app", "main.py")
+    app.routers = [parentRouter]
+    const p = new EndpointTreeProvider([app])
+    const parent = p.getParent({ type: "router", router: childRouter })
+    assert.strictEqual(parent?.type, "router")
   })
 })

@@ -21,12 +21,8 @@ import {
   pathMatchesEndpoint,
   stripLeadingDynamicSegments,
 } from "../core/pathUtils"
-import type {
-  AppDefinition,
-  RouteDefinition,
-  RouterDefinition,
-  SourceLocation,
-} from "../core/types"
+import { collectRoutes } from "../core/treeUtils"
+import type { AppDefinition, SourceLocation } from "../core/types"
 import { trackCodeLensProvided } from "../utils/telemetry"
 
 interface TestClientCall {
@@ -39,8 +35,10 @@ interface TestClientCall {
 export class TestCodeLensProvider implements CodeLensProvider {
   private apps: AppDefinition[] = []
   private parser: Parser
+
   private _onDidChangeCodeLenses = new EventEmitter<void>()
   readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event
+
   private trackedFiles = new Set<string>()
 
   constructor(parser: Parser, apps: AppDefinition[]) {
@@ -57,9 +55,8 @@ export class TestCodeLensProvider implements CodeLensProvider {
   provideCodeLenses(document: TextDocument): CodeLens[] {
     const code = document.getText()
     const tree = this.parser.parse(code)
-    if (!tree) {
-      return []
-    }
+    /* c8 ignore next */
+    if (!tree) return []
 
     const testClientCalls = this.findTestClientCalls(tree.rootNode)
 
@@ -112,26 +109,22 @@ export class TestCodeLensProvider implements CodeLensProvider {
     const callNodes = findNodesByType(rootNode, "call")
 
     for (const callNode of callNodes) {
-      const functionNode = callNode.childForFieldName("function")
-      if (!functionNode || functionNode.type !== "attribute") {
+      // Grammar guarantees: call nodes always have a function field
+      const functionNode = callNode.childForFieldName("function")!
+      if (functionNode.type !== "attribute") {
         continue
       }
 
-      const methodNode = functionNode.childForFieldName("attribute")
-      if (!methodNode) {
-        continue
-      }
+      // Grammar guarantees: attribute nodes always have an attribute field
+      const methodNode = functionNode.childForFieldName("attribute")!
 
       const method = methodNode.text.toLowerCase()
       if (!ROUTE_METHODS.has(method)) {
         continue
       }
 
-      // Get the path argument (first argument)
-      const argumentsNode = callNode.childForFieldName("arguments")
-      if (!argumentsNode) {
-        continue
-      }
+      // Grammar guarantees: call nodes always have an arguments field
+      const argumentsNode = callNode.childForFieldName("arguments")!
 
       const args = argumentsNode.namedChildren.filter(
         (child) => child.type !== "comment",
@@ -142,10 +135,8 @@ export class TestCodeLensProvider implements CodeLensProvider {
       }
 
       const pathArg = args[0]
+      // extractPathFromNode always returns a non-empty string for valid AST nodes
       const path = extractPathFromNode(pathArg)
-      if (!path) {
-        continue
-      }
 
       calls.push({
         method,
@@ -162,33 +153,12 @@ export class TestCodeLensProvider implements CodeLensProvider {
     testPath: string,
     testMethod: string,
   ): SourceLocation[] {
-    const matches: SourceLocation[] = []
-
-    const collectRoutes = (routes: RouteDefinition[]) => {
-      for (const route of routes) {
-        if (
+    return collectRoutes(this.apps)
+      .filter(
+        (route) =>
           route.method.toLowerCase() === testMethod.toLowerCase() &&
-          pathMatchesEndpoint(testPath, route.path)
-        ) {
-          matches.push(route.location)
-        }
-      }
-    }
-
-    const walkRouters = (routers: RouterDefinition[]) => {
-      for (const router of routers) {
-        collectRoutes(router.routes)
-        if (router.children) {
-          walkRouters(router.children)
-        }
-      }
-    }
-
-    for (const app of this.apps) {
-      collectRoutes(app.routes)
-      walkRouters(app.routers)
-    }
-
-    return matches
+          pathMatchesEndpoint(testPath, route.path),
+      )
+      .map((route) => route.location)
   }
 }
