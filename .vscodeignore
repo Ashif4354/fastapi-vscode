@@ -22,3 +22,7 @@ scripts/**
 *.lock*
 *.json
 !package.json
+
+# Test/coverage/scripts
+coverage/**
+scripts/**
