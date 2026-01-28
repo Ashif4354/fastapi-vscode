@@ -306,7 +306,7 @@
     "web-tree-sitter": "^0.26.3"
   },
   "lint-staged": {
-    "*.{ts,js,json}": [
+    "**/*.{ts,js,json}": [
       "biome check --write"
     ]
   }

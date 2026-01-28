@@ -396,13 +396,11 @@ suite("cloud/cloudController", () => {
       sinon.stub(deps.apiService, "getApps").resolves([testApp])
 
       // pickTeam auto-selects when only 1 team, so only pickExistingApp calls showQuickPick
-      sinon
-        .stub(vscode.window, "showQuickPick")
-        .resolves({
-          label: testApp.slug,
-          description: testApp.url,
-          app: testApp,
-        } as any)
+      sinon.stub(vscode.window, "showQuickPick").resolves({
+        label: testApp.slug,
+        description: testApp.url,
+        app: testApp,
+      } as any)
 
       const writeStub = sinon.stub(deps.configService, "writeConfig").resolves()
       sinon
