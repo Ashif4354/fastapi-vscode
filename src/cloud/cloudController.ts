@@ -27,6 +27,7 @@ export class CloudController {
   private workspaceRoot: vscode.Uri | null = null
   private refreshing = false
   private started = false
+  private appNotFoundWarningShown = false
 
   constructor(
     private authProvider: AuthProvider,
@@ -71,7 +72,7 @@ export class CloudController {
         { silent: true },
       )
       if (!session) {
-        this.statusBarItem.text = "$(cloud) Sign in to FastAPI Cloud"
+        this.statusBarItem.text = "$(cloud) Sign into FastAPI Cloud"
         return
       }
 
@@ -103,7 +104,28 @@ export class CloudController {
           console.error("[FastAPI Cloud] Failed to fetch app/team:", err)
           this.currentApp = null
           this.currentTeam = null
-          this.statusBarItem.text = "$(cloud) Set up FastAPI Cloud"
+
+          const is404 =
+            err instanceof Error && err.message.includes("returned 404")
+
+          if (is404) {
+            this.statusBarItem.text = "$(warning) FastAPI Cloud"
+            if (!this.appNotFoundWarningShown) {
+              this.appNotFoundWarningShown = true
+              vscode.window
+                .showWarningMessage(
+                  "This project is linked to a FastAPI Cloud app that could not be found. You may need to unlink and relink it.",
+                  "Unlink",
+                )
+                .then((selected) => {
+                  if (selected === "Unlink") this.unlinkProject()
+                })
+            }
+          } else {
+            // Transient error (network, 500, etc.) — don't bother the user,
+            // next refresh will retry automatically
+            this.statusBarItem.text = "$(cloud) Set up FastAPI Cloud"
+          }
         }
       }
     } finally {
@@ -315,6 +337,7 @@ export class CloudController {
       this.currentApp = null
       this.currentTeam = null
       this.hasConfig = false
+      this.appNotFoundWarningShown = false
       await this.refresh()
     }
   }

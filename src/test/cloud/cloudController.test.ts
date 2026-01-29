@@ -341,7 +341,7 @@ suite("cloud/cloudController", () => {
       dispose(deps)
     })
 
-    test("shows setup text when getApp throws", async () => {
+    test("shows warning icon and toast when getApp returns 404", async () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
 
@@ -352,12 +352,45 @@ suite("cloud/cloudController", () => {
       sinon
         .stub(deps.configService, "getConfig")
         .resolves({ app_id: "a1", team_id: "t1" })
-      sinon.stub(deps.apiService, "getApp").rejects(new Error("Not found"))
-      sinon.stub(deps.apiService, "getTeam").rejects(new Error("Not found"))
+      sinon
+        .stub(deps.apiService, "getApp")
+        .rejects(new Error("API request failed: GET /apps/a1 returned 404"))
+      sinon
+        .stub(deps.apiService, "getTeam")
+        .rejects(new Error("API request failed: GET /teams/t1 returned 404"))
+      const warnStub = sinon
+        .stub(vscode.window, "showWarningMessage")
+        .resolves(undefined as any)
+
+      await deps.controller.initialize(workspaceRoot)
+
+      assert.strictEqual(deps.statusBar.text, "$(warning) FastAPI Cloud")
+      assert.ok(warnStub.calledOnce)
+
+      dispose(deps)
+    })
+
+    test("shows setup text without toast on transient error", async () => {
+      const deps = createController()
+      const workspaceRoot = vscode.Uri.file("/tmp/test")
+
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
+      sinon.stub(deps.configService, "startWatching")
+      sinon
+        .stub(deps.configService, "getConfig")
+        .resolves({ app_id: "a1", team_id: "t1" })
+      sinon.stub(deps.apiService, "getApp").rejects(new Error("fetch failed"))
+      sinon.stub(deps.apiService, "getTeam").rejects(new Error("fetch failed"))
+      const warnStub = sinon
+        .stub(vscode.window, "showWarningMessage")
+        .resolves(undefined as any)
 
       await deps.controller.initialize(workspaceRoot)
 
       assert.strictEqual(deps.statusBar.text, "$(cloud) Set up FastAPI Cloud")
+      assert.ok(!warnStub.called)
 
       dispose(deps)
     })
