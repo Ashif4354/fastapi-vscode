@@ -12,10 +12,6 @@ node_modules/**
 dist/test/**
 dist/*.map
 
-# Test/coverage/scripts
-coverage/**
-scripts/**
-
 # Config/meta files
 .*/
 .*
