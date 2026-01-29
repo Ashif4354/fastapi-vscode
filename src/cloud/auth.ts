@@ -1,18 +1,40 @@
-import * as vscode from "vscode"
+import {
+  type AuthenticationProvider,
+  type AuthenticationProviderAuthenticationSessionsChangeEvent,
+  type AuthenticationSession,
+  authentication,
+  Disposable,
+  EventEmitter,
+  type ExtensionContext,
+  env,
+  ProgressLocation,
+  type SecretStorage,
+  UIKind,
+  Uri,
+  window,
+  workspace,
+} from "vscode"
 import { trackCloudSignIn } from "../utils/telemetry"
 import { ApiService } from "./api"
 
-const AUTH_POLL_INTERVAL_MS = 3000
 const CLIENT_ID = "fastapi-vscode"
+const NAME = "FastAPI Cloud"
+const AUTH_POLL_INTERVAL_MS = 3000
 
 interface AuthConfig {
   access_token: string
 }
 
-/** Check if a JWT token is expired. Exported for testing. */
+interface UserInfo {
+  email: string
+  full_name: string
+}
+
 export function isTokenExpired(token: string): boolean {
   try {
     const parts = token.split(".")
+
+    // Token is malformed, consider it expired
     if (parts.length !== 3) return true
 
     const decoded = JSON.parse(Buffer.from(parts[1], "base64url").toString())
@@ -24,13 +46,26 @@ export function isTokenExpired(token: string): boolean {
   }
 }
 
-export class AuthService {
-  private authUri: vscode.Uri | null = null
+export class CloudAuthenticationProvider
+  implements AuthenticationProvider, Disposable
+{
+  private authUri: Uri | null = null
   private lastAuthState = false
+  private cachedLabel: string | null = null
+
   private pollingInterval?: ReturnType<typeof setInterval>
 
-  private _onAuthStateChanged = new vscode.EventEmitter<boolean>()
-  readonly onAuthStateChanged = this._onAuthStateChanged.event
+  private _onDidChangeSessions =
+    new EventEmitter<AuthenticationProviderAuthenticationSessionsChangeEvent>()
+  private _disposable: Disposable
+
+  constructor(private readonly context: ExtensionContext) {
+    this._disposable = Disposable.from(
+      authentication.registerAuthenticationProvider(CLIENT_ID, NAME, this, {
+        supportsMultipleAccounts: false,
+      }),
+    )
+  }
 
   startWatching() {
     // Poll for auth changes since we can't use fs.watch in browser
@@ -49,15 +84,13 @@ export class AuthService {
         trackCloudSignIn()
       }
       this.lastAuthState = loggedIn
-      this._onAuthStateChanged.fire(loggedIn)
+      this._onDidChangeSessions.fire({ added: [], removed: [], changed: [] })
     }
   }
-
-  private getAuthUri(): vscode.Uri | null {
+  private getAuthUri(): Uri | null {
     if (this.authUri) return this.authUri
-
     // In browser (vscode.dev), we can't access local filesystem auth
-    if (vscode.env.uiKind === vscode.UIKind.Web) {
+    if (env.uiKind === UIKind.Web) {
       return null
     }
 
@@ -78,118 +111,189 @@ export class AuthService {
       authPath = `${xdgData}/fastapi-cli/auth.json`
     }
 
-    this.authUri = vscode.Uri.file(authPath)
+    this.authUri = Uri.file(authPath)
     return this.authUri
   }
 
-  async getToken(): Promise<string | null> {
-    const authUri = this.getAuthUri()
-    if (!authUri) return null
+  get onDidChangeSessions() {
+    return this._onDidChangeSessions.event
+  }
 
+  private async fetchUserInfo(token: string): Promise<UserInfo | null> {
     try {
-      const content = await vscode.workspace.fs.readFile(authUri)
-      const authConfig: AuthConfig = JSON.parse(
-        Buffer.from(content).toString("utf8"),
-      )
-      return authConfig.access_token
+      const response = await fetch(`${ApiService.BASE_URL}/users/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+      if (!response.ok) return null
+      const data = (await response.json()) as UserInfo
+      return data
     } catch {
       return null
     }
   }
 
+  public async getSessions(): Promise<AuthenticationSession[]> {
+    const authUri = this.getAuthUri()
+
+    try {
+      let token: string | undefined
+
+      if (env.uiKind === UIKind.Web) {
+        // In browser, use SecretStorage
+        const secretStorage: SecretStorage = this.context.secrets
+        token = await secretStorage.get("fastapi-cloud-access-token")
+      } else {
+        if (!authUri) return []
+        const content = await workspace.fs.readFile(authUri)
+        const authConfig: AuthConfig = JSON.parse(
+          Buffer.from(content).toString("utf8"),
+        )
+        token = authConfig.access_token
+      }
+
+      if (!token) {
+        return []
+      }
+
+      // Fetch user info for account label (use cached value if available)
+      let label = this.cachedLabel
+      if (!label) {
+        const userInfo = await this.fetchUserInfo(token)
+        label = userInfo?.email ?? NAME
+        this.cachedLabel = label
+      }
+
+      return [
+        {
+          id: "fastapi-cloud-session",
+          accessToken: token,
+          account: {
+            id: "fastapi-cloud-account",
+            label,
+          },
+          scopes: [],
+        },
+      ]
+    } catch {
+      return []
+    }
+  }
+
   async isLoggedIn(): Promise<boolean> {
-    const token = await this.getToken()
+    const token = await this.getSessions().then(
+      (sessions) => sessions[0]?.accessToken,
+    )
     if (!token) {
       return false
     }
     return !isTokenExpired(token)
   }
 
-  async refresh(): Promise<boolean> {
-    const loggedIn = await this.isLoggedIn()
-    this._onAuthStateChanged.fire(loggedIn)
-    return loggedIn
-  }
-
-  async signIn(): Promise<boolean> {
-    //Check if already logged in via CLI
-    if (await this.isLoggedIn()) {
-      this._onAuthStateChanged.fire(true)
-      return true
-    }
-
-    try {
-      const deviceCodeResponse = await ApiService.requestDeviceCode(CLIENT_ID)
-      // Show instructions to user
-      const verificationUri =
-        deviceCodeResponse.verification_uri_complete ||
-        `${deviceCodeResponse.verification_uri}?user_code=${deviceCodeResponse.user_code}`
-      vscode.env.openExternal(vscode.Uri.parse(verificationUri))
-
-      const intervalMs = (deviceCodeResponse.interval ?? 5) * 1000
-
-      return await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Signing in to FastAPI Cloud...",
-          cancellable: true,
-        },
-        async (_progress, cancellationToken) => {
-          const abortController = new AbortController()
-          cancellationToken.onCancellationRequested(() =>
-            abortController.abort(),
-          )
-
-          const token = await ApiService.pollDeviceToken(
-            CLIENT_ID,
-            deviceCodeResponse.device_code,
-            intervalMs,
-            abortController.signal,
-          )
-
-          await this.saveToken(token)
-          return true
-        },
-      )
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `Sign-in failed: ${error instanceof Error ? error.message : String(error)}`,
-      )
-      return false
-    }
-  }
-
   async saveToken(token: string): Promise<void> {
+    if (env.uiKind === UIKind.Web) {
+      // In browser, use SecretStorage
+      const secretStorage: SecretStorage = this.context.secrets
+      await secretStorage.store("fastapi-cloud-access-token", token)
+      return
+    }
+
     const authUri = this.getAuthUri()
     if (!authUri) return
-
-    // Create parent directory
-    const parentUri = vscode.Uri.joinPath(authUri, "..")
-    await vscode.workspace.fs.createDirectory(parentUri)
-    await vscode.workspace.fs.writeFile(
+    // Otherwise, save to filesystem so that we can share with fastapi-cloud-cli
+    const parentUri = Uri.joinPath(authUri, "..")
+    await workspace.fs.createDirectory(parentUri)
+    await workspace.fs.writeFile(
       authUri,
       Buffer.from(JSON.stringify({ access_token: token }), "utf8"),
     )
-    this._onAuthStateChanged.fire(true)
   }
 
-  /** Sign out - delete shared auth file */
-  async signOut(): Promise<void> {
-    const authUri = this.getAuthUri()
-    if (!authUri) return
+  public async createSession(): Promise<AuthenticationSession> {
+    // Return existing session if already logged in (e.g. via CLI)
+    if (await this.isLoggedIn()) {
+      const sessions = await this.getSessions()
+      return sessions[0]
+    }
 
+    const deviceCodeResponse = await ApiService.requestDeviceCode(CLIENT_ID)
+    const verificationUri =
+      deviceCodeResponse.verification_uri_complete ||
+      `${deviceCodeResponse.verification_uri}?user_code=${deviceCodeResponse.user_code}`
+    env.openExternal(Uri.parse(verificationUri))
+
+    const intervalMs = (deviceCodeResponse.interval ?? 5) * 1000
+
+    const token = await window.withProgress(
+      {
+        location: ProgressLocation.Notification,
+        title: "Signing in to FastAPI Cloud...",
+        cancellable: true,
+      },
+      async (_progress, cancellationToken) => {
+        const abortController = new AbortController()
+        cancellationToken.onCancellationRequested(() => abortController.abort())
+
+        return await ApiService.pollDeviceToken(
+          CLIENT_ID,
+          deviceCodeResponse.device_code,
+          intervalMs,
+          abortController.signal,
+        )
+      },
+    )
+
+    await this.saveToken(token)
+
+    const sessions = await this.getSessions()
+    const session = sessions[0]
+    this._onDidChangeSessions.fire({
+      added: [session],
+      removed: [],
+      changed: [],
+    })
+    return session
+  }
+
+  public async removeSession(sessionId: string): Promise<void> {
+    const authUri = this.getAuthUri()
     try {
-      await vscode.workspace.fs.delete(authUri)
+      const sessions = await this.getSessions()
+      const session = sessions.find((s) => s.id === sessionId)
+      if (session) {
+        this._onDidChangeSessions.fire({
+          added: [],
+          removed: [session],
+          changed: [],
+        })
+      }
+      // In browsers envs like vscode.dev, we use SecretStorage instead of filesystem
+      if (env.uiKind === UIKind.Web) {
+        const secretStorage: SecretStorage = this.context.secrets
+        await secretStorage.delete("fastapi-cloud-access-token")
+        // Otherwise, we need to delete the auth file from filesystem if it exists
+      } else if (authUri) {
+        await workspace.fs.delete(authUri)
+      }
     } catch {
       /* file doesn't exist */
     }
-    this._onAuthStateChanged.fire(false)
   }
 
-  dispose() {
+  async signOut(): Promise<void> {
+    this.cachedLabel = null
+    const sessions = await this.getSessions()
+    for (const session of sessions) {
+      await this.removeSession(session.id)
+    }
+  }
+
+  public async dispose() {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval)
     }
-    this._onAuthStateChanged.dispose()
+    this._disposable.dispose()
   }
 }

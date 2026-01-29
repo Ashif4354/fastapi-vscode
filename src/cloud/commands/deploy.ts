@@ -6,8 +6,10 @@ import {
   trackCloudDashboardOpened,
 } from "../../utils/telemetry"
 import type { ApiService } from "../api"
-import type { AuthService } from "../auth"
 import type { ConfigService } from "../config"
+
+const AUTH_PROVIDER_ID = "fastapi-vscode"
+
 import { pickOrCreateApp } from "../pickers"
 import { type Deployment, DeploymentStatus } from "../types"
 
@@ -61,7 +63,6 @@ export function shouldExclude(relativePath: string): boolean {
 
 export async function deploy(
   workspaceRoot: vscode.Uri,
-  authService: AuthService,
   configService: ConfigService,
   apiService: ApiService,
   statusBar?: vscode.StatusBarItem,
@@ -73,7 +74,10 @@ export async function deploy(
   }
 
   // Check auth
-  if (!(await authService.isLoggedIn())) {
+  const session = await vscode.authentication.getSession(AUTH_PROVIDER_ID, [], {
+    silent: true,
+  })
+  if (!session) {
     const result = await vscode.window.showErrorMessage(
       "You need to sign in to deploy.",
       "Sign In",

@@ -2,7 +2,6 @@ import * as assert from "node:assert"
 import sinon from "sinon"
 import * as vscode from "vscode"
 import { ApiService } from "../../cloud/api"
-import { AuthService } from "../../cloud/auth"
 import { deploy, shouldExclude } from "../../cloud/commands/deploy"
 import { ConfigService } from "../../cloud/config"
 import { DeploymentStatus } from "../../cloud/types"
@@ -16,11 +15,17 @@ const testApp = {
 }
 
 function createServices() {
-  const authService = new AuthService()
   const configService = new ConfigService()
-  const apiService = new ApiService(authService)
-  return { authService, configService, apiService }
+  const apiService = new ApiService()
+  return { configService, apiService }
 }
+
+const mockSession = {
+  accessToken: "test_token",
+  id: "fastapi-cloud-session",
+  account: { id: "fastapi-cloud-account", label: "FastAPI Cloud" },
+  scopes: [],
+} as vscode.AuthenticationSession
 
 const defaultDeployment = {
   id: "d1",
@@ -39,11 +44,10 @@ const successDeployment = {
 }
 
 function stubSuccessfulDeploy(services: {
-  authService: AuthService
   configService: ConfigService
   apiService: ApiService
 }) {
-  sinon.stub(services.authService, "isLoggedIn").resolves(true)
+  sinon.stub(vscode.authentication, "getSession").resolves(mockSession as any)
   sinon
     .stub(services.configService, "getConfig")
     .resolves({ app_id: "a1", team_id: "t1" })
@@ -111,19 +115,17 @@ suite("cloud/deploy", () => {
     })
 
     teardown(() => {
-      services.authService.dispose()
       services.configService.dispose()
     })
 
     test("returns false when not logged in", async () => {
-      sinon.stub(services.authService, "isLoggedIn").resolves(false)
+      sinon.stub(vscode.authentication, "getSession").resolves(null as any)
       const errorStub = sinon
         .stub(vscode.window, "showErrorMessage")
         .resolves(undefined as any)
 
       const result = await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
       )
@@ -133,31 +135,26 @@ suite("cloud/deploy", () => {
     })
 
     test("prompts sign in when user clicks Sign In", async () => {
-      sinon.stub(services.authService, "isLoggedIn").resolves(false)
+      sinon.stub(vscode.authentication, "getSession").resolves(null as any)
       sinon.stub(vscode.window, "showErrorMessage").resolves("Sign In" as any)
       const execStub = sinon.stub(vscode.commands, "executeCommand").resolves()
 
-      await deploy(
-        workspaceRoot,
-        services.authService,
-        services.configService,
-        services.apiService,
-      )
+      await deploy(workspaceRoot, services.configService, services.apiService)
 
       assert.ok(execStub.calledOnceWith("fastapi-vscode.signIn"))
     })
 
     test("returns false when no config and user cancels", async () => {
-      sinon.stub(services.authService, "isLoggedIn").resolves(true)
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon.stub(services.configService, "getConfig").resolves(null)
 
-      sinon.stub(services.authService, "getToken").resolves("token")
       sinon.stub(globalThis, "fetch").resolves(mockResponse({ data: [] }))
       sinon.stub(vscode.window, "showErrorMessage")
 
       const result = await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
       )
@@ -175,7 +172,6 @@ suite("cloud/deploy", () => {
 
       const result = await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
       )
@@ -199,7 +195,6 @@ suite("cloud/deploy", () => {
 
       const result = await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
       )
@@ -210,7 +205,9 @@ suite("cloud/deploy", () => {
     })
 
     test("returns false when createDeployment throws", async () => {
-      sinon.stub(services.authService, "isLoggedIn").resolves(true)
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon
         .stub(services.configService, "getConfig")
         .resolves({ app_id: "a1", team_id: "t1" })
@@ -222,7 +219,6 @@ suite("cloud/deploy", () => {
 
       const result = await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
       )
@@ -239,12 +235,7 @@ suite("cloud/deploy", () => {
         .resolves("Open App" as any)
       const openStub = sinon.stub(vscode.env, "openExternal")
 
-      await deploy(
-        workspaceRoot,
-        services.authService,
-        services.configService,
-        services.apiService,
-      )
+      await deploy(workspaceRoot, services.configService, services.apiService)
 
       assert.ok(openStub.calledOnce)
 
@@ -260,12 +251,7 @@ suite("cloud/deploy", () => {
         .resolves("View Dashboard" as any)
       const openStub = sinon.stub(vscode.env, "openExternal")
 
-      await deploy(
-        workspaceRoot,
-        services.authService,
-        services.configService,
-        services.apiService,
-      )
+      await deploy(workspaceRoot, services.configService, services.apiService)
 
       assert.ok(openStub.calledOnce)
 
@@ -289,7 +275,6 @@ suite("cloud/deploy", () => {
 
       await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
         statusBar,
@@ -308,7 +293,9 @@ suite("cloud/deploy", () => {
         dispose: sinon.stub(),
       } as unknown as vscode.StatusBarItem
 
-      sinon.stub(services.authService, "isLoggedIn").resolves(true)
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon
         .stub(services.configService, "getConfig")
         .resolves({ app_id: "a1", team_id: "t1" })
@@ -320,7 +307,6 @@ suite("cloud/deploy", () => {
 
       await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
         statusBar,
@@ -342,7 +328,6 @@ suite("cloud/deploy", () => {
 
       const result = await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
       )
@@ -355,7 +340,9 @@ suite("cloud/deploy", () => {
     test("deploys with first-time config via pickOrCreateApp", async () => {
       const clock = sinon.useFakeTimers({ shouldAdvanceTime: true })
 
-      sinon.stub(services.authService, "isLoggedIn").resolves(true)
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon.stub(services.configService, "getConfig").resolves(null)
 
       sinon
@@ -399,7 +386,6 @@ suite("cloud/deploy", () => {
 
       const result = await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
       )
@@ -432,7 +418,6 @@ suite("cloud/deploy", () => {
 
       const result = await deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
         statusBar,
@@ -450,7 +435,9 @@ suite("cloud/deploy", () => {
       const originalFs = vscode.workspace.fs
 
       try {
-        sinon.stub(services.authService, "isLoggedIn").resolves(true)
+        sinon
+          .stub(vscode.authentication, "getSession")
+          .resolves(mockSession as any)
         sinon
           .stub(services.configService, "getConfig")
           .resolves({ app_id: "a1", team_id: "t1" })
@@ -499,7 +486,6 @@ suite("cloud/deploy", () => {
 
         const result = await deploy(
           workspaceRoot,
-          services.authService,
           services.configService,
           services.apiService,
         )
@@ -540,7 +526,6 @@ suite("cloud/deploy", () => {
 
       const deployPromise = deploy(
         workspaceRoot,
-        services.authService,
         services.configService,
         services.apiService,
       )

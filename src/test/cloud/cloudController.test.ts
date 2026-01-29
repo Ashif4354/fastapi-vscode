@@ -2,7 +2,6 @@ import * as assert from "node:assert"
 import sinon from "sinon"
 import * as vscode from "vscode"
 import { ApiService } from "../../cloud/api"
-import { AuthService } from "../../cloud/auth"
 import { CloudController } from "../../cloud/cloudController"
 import { ConfigService } from "../../cloud/config"
 import type { App, Team } from "../../cloud/types"
@@ -19,15 +18,26 @@ function createStatusBarStub() {
   return statusBar
 }
 
+const mockSession = {
+  accessToken: "test_token",
+  id: "fastapi-cloud-session",
+  account: { id: "fastapi-cloud-account", label: "FastAPI Cloud" },
+  scopes: [],
+} as vscode.AuthenticationSession
+
 function createController() {
   const statusBar = createStatusBarStub()
-  const authService = new AuthService()
+  const authProvider = { signOut: sinon.stub().resolves() }
   const configService = new ConfigService()
-  const apiService = new ApiService(authService)
+  const apiService = new ApiService()
 
-  const controller = new CloudController(authService, configService, apiService)
+  const controller = new CloudController(
+    authProvider,
+    configService,
+    apiService,
+  )
 
-  return { controller, authService, configService, apiService, statusBar }
+  return { controller, authProvider, configService, apiService, statusBar }
 }
 
 const testTeam: Team = { id: "t1", name: "Test Team", slug: "test-team" }
@@ -40,8 +50,7 @@ const testApp: App = {
 
 async function initializeWithApp(deps: ReturnType<typeof createController>) {
   const workspaceRoot = vscode.Uri.file("/tmp/test")
-  sinon.stub(deps.authService, "isLoggedIn").resolves(true)
-  sinon.stub(deps.authService, "startWatching")
+  sinon.stub(vscode.authentication, "getSession").resolves(mockSession as any)
   sinon.stub(deps.configService, "startWatching")
   sinon
     .stub(deps.configService, "getConfig")
@@ -54,7 +63,6 @@ async function initializeWithApp(deps: ReturnType<typeof createController>) {
 
 function dispose(deps: ReturnType<typeof createController>) {
   deps.controller.dispose()
-  deps.authService.dispose()
   deps.configService.dispose()
 }
 
@@ -65,12 +73,13 @@ suite("cloud/cloudController", () => {
     test("calls signIn when not logged in", async () => {
       const deps = createController()
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(false)
-      const signInStub = sinon.stub(deps.authService, "signIn").resolves(true)
+      sinon.stub(vscode.authentication, "getSession").resolves(null as any)
 
       await deps.controller.showMenu()
 
-      assert.ok(signInStub.calledOnce)
+      const stub = vscode.authentication.getSession as sinon.SinonStub
+      assert.strictEqual(stub.callCount, 2)
+      assert.deepStrictEqual(stub.secondCall.args[2], { createIfNone: true })
 
       dispose(deps)
     })
@@ -78,7 +87,9 @@ suite("cloud/cloudController", () => {
     test("shows link/deploy options when logged in but no app", async () => {
       const deps = createController()
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
 
       const quickPickStub = sinon
         .stub(vscode.window, "showQuickPick")
@@ -97,7 +108,9 @@ suite("cloud/cloudController", () => {
     test("executes link command when link selected", async () => {
       const deps = createController()
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
 
       sinon
         .stub(vscode.window, "showQuickPick")
@@ -115,8 +128,9 @@ suite("cloud/cloudController", () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
-      sinon.stub(deps.authService, "startWatching")
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon.stub(deps.configService, "startWatching")
       sinon.stub(deps.configService, "getConfig").resolves(null)
       await deps.controller.initialize(workspaceRoot)
@@ -125,7 +139,6 @@ suite("cloud/cloudController", () => {
         .stub(vscode.window, "showQuickPick")
         .resolves({ label: "", id: "deploy" } as any)
 
-      sinon.stub(deps.authService, "signIn").resolves(false)
       sinon.stub(vscode.window, "showErrorMessage")
 
       await deps.controller.showMenu()
@@ -138,7 +151,9 @@ suite("cloud/cloudController", () => {
       await initializeWithApp(deps)
 
       // Restore isLoggedIn so showMenu can re-stub it
-      ;(deps.authService.isLoggedIn as sinon.SinonStub).resolves(true)
+      ;(vscode.authentication.getSession as sinon.SinonStub).resolves(
+        mockSession as any,
+      )
 
       const quickPickStub = sinon
         .stub(vscode.window, "showQuickPick")
@@ -160,7 +175,9 @@ suite("cloud/cloudController", () => {
     test("opens app URL when open selected", async () => {
       const deps = createController()
       await initializeWithApp(deps)
-      ;(deps.authService.isLoggedIn as sinon.SinonStub).resolves(true)
+      ;(vscode.authentication.getSession as sinon.SinonStub).resolves(
+        mockSession as any,
+      )
 
       sinon
         .stub(vscode.window, "showQuickPick")
@@ -177,7 +194,9 @@ suite("cloud/cloudController", () => {
     test("opens dashboard when dashboard selected", async () => {
       const deps = createController()
       await initializeWithApp(deps)
-      ;(deps.authService.isLoggedIn as sinon.SinonStub).resolves(true)
+      ;(vscode.authentication.getSession as sinon.SinonStub).resolves(
+        mockSession as any,
+      )
 
       sinon
         .stub(vscode.window, "showQuickPick")
@@ -194,7 +213,9 @@ suite("cloud/cloudController", () => {
     test("shows logs message when logs selected", async () => {
       const deps = createController()
       await initializeWithApp(deps)
-      ;(deps.authService.isLoggedIn as sinon.SinonStub).resolves(true)
+      ;(vscode.authentication.getSession as sinon.SinonStub).resolves(
+        mockSession as any,
+      )
 
       sinon
         .stub(vscode.window, "showQuickPick")
@@ -213,7 +234,9 @@ suite("cloud/cloudController", () => {
     test("shows more menu when more selected", async () => {
       const deps = createController()
       await initializeWithApp(deps)
-      ;(deps.authService.isLoggedIn as sinon.SinonStub).resolves(true)
+      ;(vscode.authentication.getSession as sinon.SinonStub).resolves(
+        mockSession as any,
+      )
 
       const quickPickStub = sinon.stub(vscode.window, "showQuickPick")
       // First call: main menu selects "more"
@@ -233,7 +256,9 @@ suite("cloud/cloudController", () => {
     test("unlinks project when unlink selected", async () => {
       const deps = createController()
       await initializeWithApp(deps)
-      ;(deps.authService.isLoggedIn as sinon.SinonStub).resolves(true)
+      ;(vscode.authentication.getSession as sinon.SinonStub).resolves(
+        mockSession as any,
+      )
 
       const quickPickStub = sinon.stub(vscode.window, "showQuickPick")
       quickPickStub.onFirstCall().resolves({ label: "", id: "more" } as any)
@@ -254,7 +279,9 @@ suite("cloud/cloudController", () => {
     test("signs out when signout selected", async () => {
       const deps = createController()
       await initializeWithApp(deps)
-      ;(deps.authService.isLoggedIn as sinon.SinonStub).resolves(true)
+      ;(vscode.authentication.getSession as sinon.SinonStub).resolves(
+        mockSession as any,
+      )
 
       const quickPickStub = sinon.stub(vscode.window, "showQuickPick")
       quickPickStub.onFirstCall().resolves({ label: "", id: "more" } as any)
@@ -263,11 +290,10 @@ suite("cloud/cloudController", () => {
       sinon
         .stub(vscode.window, "showWarningMessage")
         .resolves("Sign Out" as any)
-      const signOutStub = sinon.stub(deps.authService, "signOut").resolves()
 
       await deps.controller.showMenu()
 
-      assert.ok(signOutStub.calledOnce)
+      assert.ok((deps.authProvider.signOut as sinon.SinonStub).calledOnce)
 
       dispose(deps)
     })
@@ -277,7 +303,7 @@ suite("cloud/cloudController", () => {
     test("shows sign in text when not logged in", async () => {
       const deps = createController()
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(false)
+      sinon.stub(vscode.authentication, "getSession").resolves(null as any)
 
       await deps.controller.refresh()
 
@@ -293,8 +319,9 @@ suite("cloud/cloudController", () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
-      sinon.stub(deps.authService, "startWatching")
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon.stub(deps.configService, "startWatching")
       sinon.stub(deps.configService, "getConfig").resolves(null)
 
@@ -321,8 +348,9 @@ suite("cloud/cloudController", () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
-      sinon.stub(deps.authService, "startWatching")
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon.stub(deps.configService, "startWatching")
       sinon
         .stub(deps.configService, "getConfig")
@@ -359,7 +387,9 @@ suite("cloud/cloudController", () => {
       await initializeWithApp(deps)
 
       // deploy needs auth — stub isLoggedIn to false so it returns early
-      ;(deps.authService.isLoggedIn as sinon.SinonStub).resolves(false)
+      ;(vscode.authentication.getSession as sinon.SinonStub).resolves(
+        null as any,
+      )
       sinon.stub(vscode.window, "showErrorMessage").resolves(undefined as any)
 
       await deps.controller.runDeploy()
@@ -385,8 +415,9 @@ suite("cloud/cloudController", () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
-      sinon.stub(deps.authService, "startWatching")
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon.stub(deps.configService, "startWatching")
       sinon.stub(deps.configService, "getConfig").resolves(null)
       await deps.controller.initialize(workspaceRoot)
@@ -418,8 +449,9 @@ suite("cloud/cloudController", () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
-      sinon.stub(deps.authService, "startWatching")
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
       sinon.stub(deps.configService, "startWatching")
       sinon.stub(deps.configService, "getConfig").resolves(null)
       await deps.controller.initialize(workspaceRoot)
@@ -441,8 +473,9 @@ suite("cloud/cloudController", () => {
     test("signs out when confirmed", async () => {
       const deps = createController()
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
-      const signOutStub = sinon.stub(deps.authService, "signOut").resolves()
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
 
       sinon
         .stub(vscode.window, "showWarningMessage")
@@ -450,7 +483,7 @@ suite("cloud/cloudController", () => {
 
       await deps.controller.signOut()
 
-      assert.ok(signOutStub.calledOnce)
+      assert.ok((deps.authProvider.signOut as sinon.SinonStub).calledOnce)
 
       dispose(deps)
     })
@@ -458,14 +491,15 @@ suite("cloud/cloudController", () => {
     test("does not sign out when cancelled", async () => {
       const deps = createController()
 
-      sinon.stub(deps.authService, "isLoggedIn").resolves(true)
-      const signOutStub = sinon.stub(deps.authService, "signOut").resolves()
+      sinon
+        .stub(vscode.authentication, "getSession")
+        .resolves(mockSession as any)
 
       sinon.stub(vscode.window, "showWarningMessage").resolves(undefined as any)
 
       await deps.controller.signOut()
 
-      assert.ok(!signOutStub.called)
+      assert.ok(!(deps.authProvider.signOut as sinon.SinonStub).called)
 
       dispose(deps)
     })
@@ -523,7 +557,6 @@ suite("cloud/cloudController", () => {
     test("does not throw", () => {
       const deps = createController()
       deps.controller.dispose()
-      deps.authService.dispose()
     })
   })
 })

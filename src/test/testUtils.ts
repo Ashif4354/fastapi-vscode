@@ -129,7 +129,7 @@ export function mockResponse(body: unknown, ok = true, status = 200): Response {
     clone: () => mockResponse(body, ok, status),
     arrayBuffer: async () => new ArrayBuffer(0),
     blob: async () => new Blob(),
-    formData: async () => new FormData(),
+    formData: async () => new FormData() as never,
     text: async () => JSON.stringify(body),
     bytes: async () => new Uint8Array(),
   }

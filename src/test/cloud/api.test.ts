@@ -1,7 +1,7 @@
 import * as assert from "node:assert"
 import sinon from "sinon"
+import * as vscode from "vscode"
 import { ApiService } from "../../cloud/api"
-import { AuthService } from "../../cloud/auth"
 import { mockResponse } from "../testUtils"
 
 suite("cloud/api", () => {
@@ -174,17 +174,26 @@ suite("cloud/api", () => {
   })
 
   suite("instance methods", () => {
-    let authService: AuthService
     let api: ApiService
+    let getSessionStub: sinon.SinonStub
+
+    function mockSession(token: string | null) {
+      getSessionStub.resolves(
+        token
+          ? {
+              accessToken: token,
+              id: "s1",
+              account: { id: "a", label: "l" },
+              scopes: [],
+            }
+          : null,
+      )
+    }
 
     setup(() => {
-      authService = new AuthService()
-      sinon.stub(authService, "getToken").resolves("test_token")
-      api = new ApiService(authService)
-    })
-
-    teardown(() => {
-      authService.dispose()
+      getSessionStub = sinon.stub(vscode.authentication, "getSession")
+      mockSession("test_token")
+      api = new ApiService()
     })
 
     test("getTeams returns team data", async () => {
@@ -201,7 +210,7 @@ suite("cloud/api", () => {
     })
 
     test("throws when not authenticated", async () => {
-      ;(authService.getToken as sinon.SinonStub).resolves(null)
+      mockSession(null)
 
       await assert.rejects(() => api.getTeams(), /Not authenticated/)
     })
@@ -237,7 +246,7 @@ suite("cloud/api", () => {
     })
 
     test("request includes auth header and user-agent", async () => {
-      ;(authService.getToken as sinon.SinonStub).resolves("my_token")
+      mockSession("my_token")
 
       const fetchStub = sinon
         .stub(globalThis, "fetch")

@@ -8,11 +8,16 @@ import {
   trackCloudSignOut,
 } from "../utils/telemetry"
 import { ApiService } from "./api"
-import type { AuthService } from "./auth"
 import { deploy } from "./commands/deploy"
 import type { ConfigService } from "./config"
 import { pickExistingApp, pickTeam } from "./pickers"
 import type { App, Team } from "./types"
+
+const AUTH_PROVIDER_ID = "fastapi-vscode"
+
+interface AuthProvider {
+  signOut(): Promise<void>
+}
 
 export class CloudController {
   private statusBarItem: vscode.StatusBarItem
@@ -22,7 +27,7 @@ export class CloudController {
   private refreshing = false
 
   constructor(
-    private authService: AuthService,
+    private authProvider: AuthProvider,
     private configService: ConfigService,
     private apiService: ApiService,
   ) {
@@ -36,10 +41,11 @@ export class CloudController {
 
   async initialize(workspaceRoot: vscode.Uri) {
     this.workspaceRoot = workspaceRoot
-    this.authService.onAuthStateChanged(() => this.refresh())
+    vscode.authentication.onDidChangeSessions((e) => {
+      if (e.provider.id === AUTH_PROVIDER_ID) this.refresh()
+    })
     this.configService.onConfigStateChanged(() => this.refresh())
 
-    this.authService.startWatching()
     this.configService.startWatching(workspaceRoot)
 
     await this.refresh()
@@ -50,8 +56,12 @@ export class CloudController {
     if (this.refreshing) return
     this.refreshing = true
     try {
-      const isLoggedIn = await this.authService.isLoggedIn()
-      if (!isLoggedIn) {
+      const session = await vscode.authentication.getSession(
+        AUTH_PROVIDER_ID,
+        [],
+        { silent: true },
+      )
+      if (!session) {
         this.statusBarItem.text = "$(cloud) Sign in to FastAPI Cloud"
         return
       }
@@ -81,9 +91,15 @@ export class CloudController {
   }
 
   async showMenu() {
-    const isLoggedIn = await this.authService.isLoggedIn()
-    if (!isLoggedIn) {
-      this.authService.signIn()
+    const session = await vscode.authentication.getSession(
+      AUTH_PROVIDER_ID,
+      [],
+      { silent: true },
+    )
+    if (!session) {
+      vscode.authentication.getSession(AUTH_PROVIDER_ID, [], {
+        createIfNone: true,
+      })
       return
     }
 
@@ -179,7 +195,6 @@ export class CloudController {
     }
     await deploy(
       this.workspaceRoot,
-      this.authService,
       this.configService,
       this.apiService,
       this.statusBarItem,
@@ -245,7 +260,7 @@ export class CloudController {
     )
 
     if (confirm === "Sign Out") {
-      await this.authService.signOut()
+      await this.authProvider.signOut()
       trackCloudSignOut()
       this.currentApp = null
       this.currentTeam = null

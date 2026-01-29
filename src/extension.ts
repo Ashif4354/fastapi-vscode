@@ -5,7 +5,7 @@
 import * as vscode from "vscode"
 import { discoverFastAPIApps } from "./appDiscovery"
 import { ApiService } from "./cloud/api"
-import { AuthService } from "./cloud/auth"
+import { CloudAuthenticationProvider } from "./cloud/auth"
 import { CloudController } from "./cloud/cloudController"
 import { ConfigService } from "./cloud/config"
 import { clearImportCache } from "./core/importResolver"
@@ -196,18 +196,19 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri
   if (cloudEnabled && workspaceRoot) {
-    const authService = new AuthService()
+    const authProvider = new CloudAuthenticationProvider(context)
+    authProvider.startWatching()
     const configService = new ConfigService()
-    const apiService = new ApiService(authService)
+    const apiService = new ApiService()
     const cloudController = new CloudController(
-      authService,
+      authProvider,
       configService,
       apiService,
     )
     cloudController.initialize(workspaceRoot)
 
     context.subscriptions.push(
-      { dispose: () => authService.dispose() },
+      { dispose: () => authProvider.dispose() },
       { dispose: () => configService.dispose() },
       { dispose: () => cloudController.dispose() },
       registerCloudCommands(cloudController),
@@ -262,13 +263,9 @@ function registerCloudCommands(
     }),
 
     vscode.commands.registerCommand("fastapi-vscode.signIn", async () => {
-      const action = await vscode.window.showInformationMessage(
-        "To sign in, run 'fastapi auth login' in your terminal.",
-        "Open Terminal",
-      )
-      if (action === "Open Terminal") {
-        vscode.commands.executeCommand("workbench.action.terminal.new")
-      }
+      vscode.authentication.getSession("fastapi-vscode", [], {
+        createIfNone: true,
+      })
     }),
 
     vscode.commands.registerCommand("fastapi-vscode.signOut", async () => {

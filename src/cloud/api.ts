@@ -1,6 +1,7 @@
 import * as vscode from "vscode"
-import type { AuthService } from "./auth"
 import type { App, Deployment, ListResponse, Team } from "./types"
+
+const AUTH_PROVIDER_ID = "fastapi-vscode"
 
 export interface UploadInfo {
   url: string
@@ -18,8 +19,6 @@ export class ApiService {
   public static readonly BASE_URL = "https://api.fastapicloud.com/api/v1"
   public static readonly DASHBOARD_URL = "https://dashboard.fastapicloud.com"
 
-  constructor(private authService: AuthService) {}
-
   static getDashboardUrl(teamSlug: string, appSlug: string): string {
     return `${ApiService.DASHBOARD_URL}/${teamSlug}/apps/${appSlug}/general`
   }
@@ -28,10 +27,15 @@ export class ApiService {
     endpoint: string,
     options: RequestInit = {},
   ): Promise<T> {
-    const token = await this.authService.getToken()
-    if (!token) {
+    const session = await vscode.authentication.getSession(
+      AUTH_PROVIDER_ID,
+      [],
+      { silent: true },
+    )
+    if (!session) {
       throw new Error("Not authenticated")
     }
+    const token = session.accessToken
 
     const response = await fetch(`${ApiService.BASE_URL}${endpoint}`, {
       ...options,
