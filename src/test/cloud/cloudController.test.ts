@@ -315,7 +315,7 @@ suite("cloud/cloudController", () => {
       dispose(deps)
     })
 
-    test("shows deploy text when logged in but no config", async () => {
+    test("shows setup text when logged in but no config", async () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
 
@@ -327,10 +327,7 @@ suite("cloud/cloudController", () => {
 
       await deps.controller.initialize(workspaceRoot)
 
-      assert.strictEqual(
-        deps.statusBar.text,
-        "$(cloud) Deploy to FastAPI Cloud",
-      )
+      assert.strictEqual(deps.statusBar.text, "$(cloud) Set up FastAPI Cloud")
 
       dispose(deps)
     })
@@ -344,7 +341,7 @@ suite("cloud/cloudController", () => {
       dispose(deps)
     })
 
-    test("shows deploy text when getApp throws", async () => {
+    test("shows setup text when getApp throws", async () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
 
@@ -360,10 +357,7 @@ suite("cloud/cloudController", () => {
 
       await deps.controller.initialize(workspaceRoot)
 
-      assert.strictEqual(
-        deps.statusBar.text,
-        "$(cloud) Deploy to FastAPI Cloud",
-      )
+      assert.strictEqual(deps.statusBar.text, "$(cloud) Set up FastAPI Cloud")
 
       dispose(deps)
     })

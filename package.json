@@ -32,6 +32,12 @@
     }
   },
   "contributes": {
+    "authentication": [
+      {
+        "id": "fastapi-vscode",
+        "label": "FastAPI Cloud"
+      }
+    ],
     "commands": [
       {
         "command": "fastapi-vscode.refreshEndpoints",

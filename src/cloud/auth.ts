@@ -154,7 +154,7 @@ export class CloudAuthenticationProvider
         token = authConfig.access_token
       }
 
-      if (!token) {
+      if (!token || isTokenExpired(token)) {
         return []
       }
 
@@ -218,7 +218,23 @@ export class CloudAuthenticationProvider
       return sessions[0]
     }
 
-    const deviceCodeResponse = await ApiService.requestDeviceCode(CLIENT_ID)
+    let deviceCodeResponse: Awaited<
+      ReturnType<typeof ApiService.requestDeviceCode>
+    >
+    try {
+      deviceCodeResponse = await ApiService.requestDeviceCode(CLIENT_ID)
+    } catch (error) {
+      if (
+        error instanceof TypeError &&
+        (error.message === "Failed to fetch" ||
+          error.message === "fetch failed")
+      ) {
+        throw new Error(
+          "Unable to connect to FastAPI Cloud. Please check your network connection and try again.",
+        )
+      }
+      throw error
+    }
     const verificationUri =
       deviceCodeResponse.verification_uri_complete ||
       `${deviceCodeResponse.verification_uri}?user_code=${deviceCodeResponse.user_code}`

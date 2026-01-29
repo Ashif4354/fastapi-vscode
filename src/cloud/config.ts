@@ -48,8 +48,9 @@ export class ConfigService {
         ConfigService.CONFIG_FILE,
       )
       const data = await vscode.workspace.fs.readFile(uri)
-      return JSON.parse(Buffer.from(data).toString("utf-8"))
-    } catch {
+      return JSON.parse(new TextDecoder().decode(data))
+    } catch (err) {
+      console.error("[FastAPI Cloud] Failed to read config:", err)
       return null
     }
   }
@@ -66,21 +67,21 @@ export class ConfigService {
       const configUri = vscode.Uri.joinPath(dirUri, ConfigService.CONFIG_FILE)
       await vscode.workspace.fs.writeFile(
         configUri,
-        Buffer.from(JSON.stringify(config), "utf-8"),
+        new TextEncoder().encode(JSON.stringify(config)),
       )
 
       // README.md
       const readmeUri = vscode.Uri.joinPath(dirUri, "README.md")
       await vscode.workspace.fs.writeFile(
         readmeUri,
-        Buffer.from(README_CONTENT, "utf-8"),
+        new TextEncoder().encode(README_CONTENT),
       )
 
       // .gitignore
       const gitignoreUri = vscode.Uri.joinPath(dirUri, ".gitignore")
       await vscode.workspace.fs.writeFile(
         gitignoreUri,
-        Buffer.from("*", "utf-8"),
+        new TextEncoder().encode("*"),
       )
     } catch {
       // Failed to write config

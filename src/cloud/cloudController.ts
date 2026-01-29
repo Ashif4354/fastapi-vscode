@@ -23,8 +23,10 @@ export class CloudController {
   private statusBarItem: vscode.StatusBarItem
   private currentApp: App | null = null
   private currentTeam: Team | null = null
+  private hasConfig = false
   private workspaceRoot: vscode.Uri | null = null
   private refreshing = false
+  private started = false
 
   constructor(
     private authProvider: AuthProvider,
@@ -39,17 +41,24 @@ export class CloudController {
     this.statusBarItem.command = "fastapi-vscode.cloudMenu"
   }
 
+  showStatusBar() {
+    this.statusBarItem.text = "$(cloud) FastAPI Cloud"
+    this.statusBarItem.show()
+    if (!this.started) {
+      this.started = true
+      vscode.authentication.onDidChangeSessions((e) => {
+        if (e.provider.id === AUTH_PROVIDER_ID) this.refresh()
+      })
+    }
+  }
+
   async initialize(workspaceRoot: vscode.Uri) {
     this.workspaceRoot = workspaceRoot
-    vscode.authentication.onDidChangeSessions((e) => {
-      if (e.provider.id === AUTH_PROVIDER_ID) this.refresh()
-    })
     this.configService.onConfigStateChanged(() => this.refresh())
-
     this.configService.startWatching(workspaceRoot)
 
+    this.showStatusBar()
     await this.refresh()
-    this.statusBarItem.show()
   }
 
   async refresh() {
@@ -70,9 +79,18 @@ export class CloudController {
         const config = await this.configService.getConfig(this.workspaceRoot)
 
         if (!config) {
-          this.statusBarItem.text = "$(cloud) Deploy to FastAPI Cloud"
+          console.log(
+            "[FastAPI Cloud] No config found at",
+            this.workspaceRoot.toString(),
+          )
+          this.hasConfig = false
+          this.currentApp = null
+          this.currentTeam = null
+          this.statusBarItem.text = "$(cloud) Set up FastAPI Cloud"
           return
         }
+
+        this.hasConfig = true
 
         try {
           this.currentApp = await this.apiService.getApp(config.app_id)
@@ -81,8 +99,11 @@ export class CloudController {
           if (this.currentApp) {
             this.statusBarItem.text = `$(cloud) ${this.currentApp.slug}`
           }
-        } catch {
-          this.statusBarItem.text = "$(cloud) Deploy to FastAPI Cloud"
+        } catch (err) {
+          console.error("[FastAPI Cloud] Failed to fetch app/team:", err)
+          this.currentApp = null
+          this.currentTeam = null
+          this.statusBarItem.text = "$(cloud) Set up FastAPI Cloud"
         }
       }
     } finally {
@@ -103,7 +124,7 @@ export class CloudController {
       return
     }
 
-    if (!this.currentApp) {
+    if (!this.currentApp && !this.hasConfig) {
       // No app linked - show link/deploy options
       const items = [
         {
@@ -119,7 +140,7 @@ export class CloudController {
       ]
 
       const selected = await vscode.window.showQuickPick(items, {
-        placeHolder: "Deploy to FastAPI Cloud",
+        placeHolder: "Set up FastAPI Cloud",
       })
 
       if (selected?.id === "link") {
@@ -127,12 +148,20 @@ export class CloudController {
       } else if (selected?.id === "deploy") {
         await this.runDeploy()
       }
+    } else if (!this.currentApp && this.hasConfig) {
+      // Config exists but app fetch failed - warn and offer relink/unlink
+      const selected = await vscode.window.showWarningMessage(
+        "This project is linked to a FastAPI Cloud app that could not be found. Unlink it, then link to the correct app.",
+        "Unlink",
+      )
+
+      if (selected === "Unlink") {
+        await this.unlinkProject()
+      }
     } else {
+      const app = this.currentApp!
       const dashboardUrl = this.currentTeam
-        ? ApiService.getDashboardUrl(
-            this.currentTeam.slug,
-            this.currentApp.slug,
-          )
+        ? ApiService.getDashboardUrl(this.currentTeam.slug, app.slug)
         : undefined
       const items = [
         {
@@ -142,7 +171,7 @@ export class CloudController {
         },
         {
           label: "$(globe) Open App",
-          description: this.currentApp.url,
+          description: app.url,
           id: "open",
         },
         {
@@ -155,7 +184,7 @@ export class CloudController {
       ]
 
       const selected = await vscode.window.showQuickPick(items, {
-        placeHolder: `${this.currentApp.slug}`,
+        placeHolder: app.slug,
       })
 
       if (selected) {
@@ -269,12 +298,13 @@ export class CloudController {
   }
 
   async unlinkProject() {
-    if (!this.workspaceRoot || !this.currentApp) {
+    if (!this.workspaceRoot || !this.hasConfig) {
       return
     }
 
+    const label = this.currentApp?.slug ?? "this app"
     const confirm = await vscode.window.showWarningMessage(
-      `Unlink "${this.currentApp.slug}" from this project?`,
+      `Unlink "${label}" from this project?`,
       { modal: true },
       "Unlink",
     )
@@ -284,6 +314,7 @@ export class CloudController {
       trackCloudProjectUnlinked()
       this.currentApp = null
       this.currentTeam = null
+      this.hasConfig = false
       await this.refresh()
     }
   }

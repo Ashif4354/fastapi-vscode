@@ -14,10 +14,12 @@ export async function pickTeam(apiService: ApiService): Promise<Team | null> {
   let teams: Team[]
   try {
     teams = await apiService.getTeams()
-  } catch {
-    vscode.window.showErrorMessage(
-      "Failed to fetch teams. Please check your connection.",
-    )
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message === "Not authenticated"
+        ? "Please sign in to FastAPI Cloud first."
+        : "Failed to fetch teams. Please check your connection."
+    vscode.window.showErrorMessage(message)
     return null
   }
 

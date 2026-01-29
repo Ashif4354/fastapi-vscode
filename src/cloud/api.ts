@@ -15,6 +15,12 @@ function getExtensionVersion(): string {
   )
 }
 
+function getUserAgentHeaders(): Record<string, string> {
+  // User-Agent is a forbidden header in browsers and causes fetch to fail
+  if (vscode.env.uiKind === vscode.UIKind.Web) return {}
+  return { "User-Agent": `fastapi-vscode/${getExtensionVersion()}` }
+}
+
 export class ApiService {
   public static readonly BASE_URL = "https://api.fastapicloud.com/api/v1"
   public static readonly DASHBOARD_URL = "https://dashboard.fastapicloud.com"
@@ -42,7 +48,7 @@ export class ApiService {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        "User-Agent": `fastapi-vscode/${getExtensionVersion()}`,
+        ...getUserAgentHeaders(),
         ...options.headers,
       },
     })
@@ -124,7 +130,7 @@ export class ApiService {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": `fastapi-vscode/${getExtensionVersion()}`,
+          ...getUserAgentHeaders(),
         },
         body: new URLSearchParams({ client_id: clientId }).toString(),
       },

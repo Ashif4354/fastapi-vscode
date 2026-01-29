@@ -189,15 +189,26 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   }
 
-  // Cloud status bar (if enabled)
+  // Cloud (if enabled)
   const cloudEnabled = vscode.workspace
     .getConfiguration("fastapi")
     .get<boolean>("cloud.enabled", true)
 
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri
-  if (cloudEnabled && workspaceRoot) {
+  if (cloudEnabled) {
+    // Auth provider must be registered regardless of workspace,
+    // so sign-in works from command palette and Accounts menu in vscode.dev
     const authProvider = new CloudAuthenticationProvider(context)
     authProvider.startWatching()
+
+    context.subscriptions.push(
+      { dispose: () => authProvider.dispose() },
+      vscode.commands.registerCommand("fastapi-vscode.signIn", async () => {
+        await vscode.authentication.getSession("fastapi-vscode", [], {
+          createIfNone: true,
+        })
+      }),
+    )
+
     const configService = new ConfigService()
     const apiService = new ApiService()
     const cloudController = new CloudController(
@@ -205,10 +216,28 @@ export async function activate(context: vscode.ExtensionContext) {
       configService,
       apiService,
     )
-    cloudController.initialize(workspaceRoot)
+
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri
+    if (workspaceRoot) {
+      cloudController.initialize(workspaceRoot)
+    } else {
+      // In vscode.dev, workspace folders may not be available yet at activation
+      const folderDisposable = vscode.workspace.onDidChangeWorkspaceFolders(
+        (e) => {
+          const root = e.added[0]?.uri
+          if (root) {
+            folderDisposable.dispose()
+            cloudController.initialize(root)
+          }
+        },
+      )
+      context.subscriptions.push(folderDisposable)
+      // Show status bar immediately even without workspace
+      cloudController.showStatusBar()
+      cloudController.refresh()
+    }
 
     context.subscriptions.push(
-      { dispose: () => authProvider.dispose() },
       { dispose: () => configService.dispose() },
       { dispose: () => cloudController.dispose() },
       registerCloudCommands(cloudController),
@@ -260,12 +289,6 @@ function registerCloudCommands(
 
     vscode.commands.registerCommand("fastapi-vscode.deploy", async () => {
       await cloudController.runDeploy()
-    }),
-
-    vscode.commands.registerCommand("fastapi-vscode.signIn", async () => {
-      vscode.authentication.getSession("fastapi-vscode", [], {
-        createIfNone: true,
-      })
     }),
 
     vscode.commands.registerCommand("fastapi-vscode.signOut", async () => {
