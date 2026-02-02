@@ -4,6 +4,7 @@
  */
 
 import * as vscode from "vscode"
+import { getExtensionVersion } from "../../extension"
 import { client } from "./client"
 import type { ClientInfo } from "./types"
 
@@ -87,9 +88,7 @@ export async function initVSCodeTelemetry(
   }
 
   const userId = await getOrCreateUserId(context)
-  const extensionVersion =
-    vscode.extensions.getExtension("FastAPILabs.fastapi-vscode")?.packageJSON
-      ?.version ?? "unknown"
+  const extensionVersion = getExtensionVersion()
 
   await client.init({
     userId,
@@ -107,8 +106,8 @@ async function fetchPackageVersions(
   pythonPath: string,
   packages: readonly string[],
 ): Promise<{ [key: string]: string | undefined }> {
-  const { promisify } = await import("util")
-  const { execFile } = await import("child_process")
+  const { promisify } = await import("node:util")
+  const { execFile } = await import("node:child_process")
   const execFileAsync = promisify(execFile)
 
   // Fetch all package versions in parallel

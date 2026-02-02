@@ -4,17 +4,15 @@
 
 import * as vscode from "vscode"
 import { discoverFastAPIApps } from "./appDiscovery"
+import { ApiService } from "./cloud/api"
+import { AUTH_PROVIDER_ID, CloudAuthenticationProvider } from "./cloud/auth"
+import { ConfigService } from "./cloud/config"
+import { CloudController } from "./cloud/controller"
 import { clearImportCache } from "./core/importResolver"
 import { Parser } from "./core/parser"
 import { stripLeadingDynamicSegments } from "./core/pathUtils"
 import { collectRoutes, countRouters } from "./core/treeUtils"
 import type { AppDefinition, SourceLocation } from "./core/types"
-import {
-  type EndpointTreeItem,
-  EndpointTreeProvider,
-  METHOD_ICONS,
-} from "./providers/endpointTreeProvider"
-import { TestCodeLensProvider } from "./providers/testCodeLensProvider"
 import { disposeLogger, log } from "./utils/logger"
 import {
   createTimer,
@@ -32,6 +30,21 @@ import {
   trackSearchExecuted,
   trackTreeViewVisible,
 } from "./utils/telemetry"
+import {
+  type EndpointTreeItem,
+  EndpointTreeProvider,
+  METHOD_ICONS,
+} from "./vscode/endpointTreeProvider"
+import { TestCodeLensProvider } from "./vscode/testCodeLensProvider"
+
+export const EXTENSION_ID = "FastAPILabs.fastapi-vscode"
+
+export function getExtensionVersion(): string {
+  return (
+    vscode.extensions.getExtension(EXTENSION_ID)?.packageJSON?.version ??
+    "unknown"
+  )
+}
 
 let parserService: Parser | null = null
 
@@ -45,9 +58,7 @@ function navigateToLocation(location: SourceLocation): void {
 
 export async function activate(context: vscode.ExtensionContext) {
   const elapsed = createTimer()
-  const extensionVersion =
-    vscode.extensions.getExtension("FastAPILabs.fastapi-vscode")?.packageJSON
-      ?.version ?? "unknown"
+  const extensionVersion = getExtensionVersion()
   log(
     `FastAPI extension ${extensionVersion} activated (VS Code ${vscode.version})`,
   )
@@ -185,6 +196,84 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   }
 
+  const cloudEnabled = vscode.workspace
+    .getConfiguration("fastapi")
+    .get<boolean>("cloud.enabled", true)
+
+  if (cloudEnabled) {
+    // Auth provider must be registered regardless of workspace,
+    // so sign-in works from command palette and Accounts menu in vscode.dev
+    const authProvider = new CloudAuthenticationProvider(context)
+    authProvider.startWatching()
+
+    context.subscriptions.push(
+      { dispose: () => authProvider.dispose() },
+      vscode.commands.registerCommand("fastapi-vscode.signIn", async () => {
+        await vscode.authentication.getSession(AUTH_PROVIDER_ID, [], {
+          createIfNone: true,
+        })
+      }),
+    )
+
+    const configService = new ConfigService()
+    const apiService = new ApiService()
+
+    const statusBarItem = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Left,
+      100,
+    )
+    statusBarItem.command = "fastapi-vscode.cloudMenu"
+
+    const cloudController = new CloudController(
+      authProvider,
+      configService,
+      apiService,
+      statusBarItem,
+    )
+
+    // Show status bar immediately - don't wait for initialization
+    cloudController.showStatusBar()
+
+    // Initialize with all workspace folders
+    cloudController.initialize().catch((error) => {
+      log(`Cloud controller initialization failed: ${error}`)
+      // Continue even if initialization fails
+    })
+
+    // Handle workspace folder changes
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeWorkspaceFolders((e) => {
+        for (const folder of e.added) {
+          cloudController.addWorkspaceFolder(folder.uri)
+        }
+        for (const folder of e.removed) {
+          cloudController.removeWorkspaceFolder(folder.uri)
+        }
+      }),
+    )
+
+    context.subscriptions.push(
+      { dispose: () => configService.dispose() },
+      { dispose: () => cloudController.dispose() },
+      registerCloudCommands(cloudController),
+    )
+  }
+
+  // Watch for cloud.enabled setting changes
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (e.affectsConfiguration("fastapi.cloud.enabled")) {
+        const action = await vscode.window.showWarningMessage(
+          "FastAPI Cloud setting changed. Reload the window to apply changes.",
+          "Reload Window",
+        )
+        if (action === "Reload Window") {
+          vscode.commands.executeCommand("workbench.action.reloadWindow")
+        }
+      }
+    }),
+  )
+
   // Periodic telemetry flush (every 5 minutes)
   const telemetryFlushInterval = setInterval(flushSessionSummary, 5 * 60 * 1000)
 
@@ -194,6 +283,56 @@ export async function activate(context: vscode.ExtensionContext) {
     treeView,
     registerCommands(endpointProvider, codeLensProvider, groupApps),
     { dispose: () => clearInterval(telemetryFlushInterval) },
+  )
+}
+
+function registerCloudCommands(
+  cloudController: CloudController,
+): vscode.Disposable {
+  return vscode.Disposable.from(
+    vscode.commands.registerCommand("fastapi-vscode.cloudMenu", async () => {
+      try {
+        await cloudController.showMenu()
+      } catch (error) {
+        log(`Cloud menu error: ${error}`)
+        vscode.window.showErrorMessage(
+          `Failed to show cloud menu: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.linkApp", async () => {
+      try {
+        await cloudController.linkProject()
+      } catch (error) {
+        log(`Link app error: ${error}`)
+        vscode.window.showErrorMessage(
+          `Failed to link app: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.unlinkApp", async () => {
+      try {
+        await cloudController.unlinkProject()
+      } catch (error) {
+        log(`Unlink app error: ${error}`)
+        vscode.window.showErrorMessage(
+          `Failed to unlink app: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }),
+
+    vscode.commands.registerCommand("fastapi-vscode.signOut", async () => {
+      try {
+        await cloudController.signOut()
+      } catch (error) {
+        log(`Sign out error: ${error}`)
+        vscode.window.showErrorMessage(
+          `Failed to sign out: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }),
   )
 }
 

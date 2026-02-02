@@ -20,6 +20,13 @@ export const Events = {
   SEARCH_EXECUTED: "extension_search_executed",
   ROUTE_NAVIGATED: "extension_route_navigated",
   ROUTE_COPIED: "extension_route_copied",
+  // Cloud events (deployment events are tracked server-side)
+  CLOUD_SIGN_IN: "extension_cloud_sign_in",
+  CLOUD_SIGN_OUT: "extension_cloud_sign_out",
+  CLOUD_PROJECT_LINKED: "extension_cloud_project_linked",
+  CLOUD_PROJECT_UNLINKED: "extension_cloud_project_unlinked",
+  CLOUD_DASHBOARD_OPENED: "extension_cloud_dashboard_opened",
+  CLOUD_APP_OPENED: "extension_cloud_app_opened",
 } as const
 
 // Session counters for aggregated tracking
@@ -155,5 +162,31 @@ export function trackDeactivation(): void {
       session_duration_ms: duration,
     })
   }
+}
+
+// Cloud telemetry functions
+
+export function trackCloudSignIn(): void {
+  client.capture(Events.CLOUD_SIGN_IN)
+}
+
+export function trackCloudSignOut(): void {
+  client.capture(Events.CLOUD_SIGN_OUT)
+}
+
+export function trackCloudProjectLinked(appName: string): void {
+  client.capture(Events.CLOUD_PROJECT_LINKED, { app_name: appName })
+}
+
+export function trackCloudProjectUnlinked(appName: string): void {
+  client.capture(Events.CLOUD_PROJECT_UNLINKED, { app_name: appName })
+}
+
+export function trackCloudDashboardOpened(appName: string): void {
+  client.capture(Events.CLOUD_DASHBOARD_OPENED, { app_name: appName })
+}
+
+export function trackCloudAppOpened(appName: string): void {
+  client.capture(Events.CLOUD_APP_OPENED, { app_name: appName })
 }
 /* c8 ignore stop */
