@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 import type { ApiService } from "../api"
-import { Picker } from "../constants"
 import type { App, Team } from "../types"
+import { ui } from "./dialogs"
 
 /**
  * Shows a quick pick to select a team. Auto-selects if only one team.
@@ -13,14 +13,16 @@ export async function pickTeam(apiService: ApiService): Promise<Team | null> {
   } catch (error) {
     const message =
       error instanceof Error && error.message === "Not authenticated"
-        ? Picker.ERR_NOT_AUTHENTICATED
-        : Picker.ERR_FETCH_TEAMS
-    vscode.window.showErrorMessage(message)
+        ? "Please sign in to FastAPI Cloud first."
+        : "Failed to fetch teams. Please check your connection."
+    ui.showErrorMessage(message)
     return null
   }
 
   if (teams.length === 0) {
-    vscode.window.showErrorMessage(Picker.ERR_NO_TEAMS)
+    ui.showErrorMessage(
+      "No teams found. Please create a team on FastAPI Cloud first.",
+    )
     return null
   }
 
@@ -29,8 +31,8 @@ export async function pickTeam(apiService: ApiService): Promise<Team | null> {
   }
 
   const teamItems = teams.map((t) => ({ label: t.name, team: t }))
-  const picked = await vscode.window.showQuickPick(teamItems, {
-    placeHolder: Picker.SELECT_TEAM,
+  const picked = await ui.showQuickPick(teamItems, {
+    placeHolder: "Select a team",
   })
 
   return picked?.team ?? null
@@ -47,12 +49,14 @@ export async function pickExistingApp(
   try {
     apps = await apiService.getApps(team.id)
   } catch {
-    vscode.window.showErrorMessage(Picker.ERR_FETCH_APPS)
+    ui.showErrorMessage("Failed to fetch apps. Please check your connection.")
     return null
   }
 
   if (apps.length === 0) {
-    vscode.window.showErrorMessage(Picker.ERR_NO_APPS)
+    ui.showErrorMessage(
+      "No apps found for this team. Please create an app on FastAPI Cloud first.",
+    )
     return null
   }
 
@@ -61,8 +65,8 @@ export async function pickExistingApp(
     description: a.url,
     app: a,
   }))
-  const picked = await vscode.window.showQuickPick(appItems, {
-    placeHolder: Picker.SELECT_APP,
+  const picked = await ui.showQuickPick(appItems, {
+    placeHolder: "Select an app",
   })
 
   return picked?.app ?? null
@@ -77,11 +81,13 @@ export async function createNewApp(
   defaultName: string,
 ): Promise<App | null> {
   const appName = await vscode.window.showInputBox({
-    prompt: Picker.PROMPT_ENTER_APP_NAME,
+    prompt: "Enter app name",
     value: defaultName,
     validateInput: (value) => {
-      if (!value || value.length < 2) return Picker.ERR_NAME_TOO_SHORT
-      if (!/^[a-z0-9-]+$/.test(value)) return Picker.ERR_NAME_INVALID
+      if (!value || value.length < 2)
+        return "Name must be at least 2 characters."
+      if (!/^[a-z0-9-]+$/.test(value))
+        return "Name can only contain lowercase letters, numbers, and hyphens."
       return null
     },
   })
@@ -90,13 +96,11 @@ export async function createNewApp(
 
   try {
     const app = await apiService.createApp(team.id, appName)
-    vscode.window.showInformationMessage(Picker.MSG_APP_CREATED(app.slug))
+    ui.showInformationMessage(`Created app: ${app.slug}`)
     return app
   } catch (error) {
-    vscode.window.showErrorMessage(
-      Picker.ERR_CREATE_APP(
-        error instanceof Error ? error.message : "Unknown error",
-      ),
+    ui.showErrorMessage(
+      `Failed to create app: ${error instanceof Error ? error.message : "Unknown error"}`,
     )
     return null
   }

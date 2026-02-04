@@ -88,7 +88,7 @@ function dispose(deps: ReturnType<typeof createController>) {
   deps.configService.dispose()
 }
 
-suite("cloud/cloudController", () => {
+suite("cloud/controller", () => {
   teardown(() => sinon.restore())
 
   suite("showMenu", () => {

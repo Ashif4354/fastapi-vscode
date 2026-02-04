@@ -3,6 +3,7 @@ import { dirname, join } from "node:path"
 import sinon from "sinon"
 import * as vscode from "vscode"
 import type { ApiService } from "../cloud/api"
+import type { ConfigService } from "../cloud/config"
 import type { FileSystem } from "../core/filesystem"
 
 declare const __DIST_ROOT__: string
@@ -154,13 +155,29 @@ export function mockResponse(body: unknown, ok = true, status = 200): Response {
   } as unknown as Response
 }
 
-export function mockApiService(
-  overrides: Partial<ApiService> = {},
-): ApiService {
+export function mockApiService(overrides?: Partial<ApiService>) {
   return {
+    getUser: sinon.stub().resolves(null),
     getTeams: sinon.stub().resolves([]),
     getApps: sinon.stub().resolves([]),
-    createApp: sinon.stub().resolves({ id: "a1", slug: "new-app", url: "" }),
+    createApp: sinon.stub(),
+    getApp: sinon.stub(),
+    getTeam: sinon.stub(),
+    createDeployment: sinon.stub(),
+    getUploadUrl: sinon.stub(),
+    completeUpload: sinon.stub(),
+    getDeployment: sinon.stub(),
     ...overrides,
-  } as unknown as ApiService
+  } as unknown as sinon.SinonStubbedInstance<ApiService>
+}
+
+export function mockConfigService() {
+  return {
+    getConfig: sinon.stub(),
+    writeConfig: sinon.stub(),
+    deleteConfig: sinon.stub(),
+    startWatching: sinon.stub(),
+    dispose: sinon.stub(),
+    onConfigStateChanged: sinon.stub(),
+  } as unknown as sinon.SinonStubbedInstance<ConfigService>
 }

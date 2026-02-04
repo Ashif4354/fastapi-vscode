@@ -333,6 +333,16 @@ function registerCloudCommands(
         )
       }
     }),
+    vscode.commands.registerCommand("fastapi-vscode.deploy", async () => {
+      try {
+        await cloudController.deploy()
+      } catch (error) {
+        log(`Deploy error: ${error}`)
+        vscode.window.showErrorMessage(
+          `Failed to deploy: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }),
   )
 }
 
