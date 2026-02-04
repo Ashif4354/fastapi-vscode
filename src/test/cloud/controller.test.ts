@@ -106,7 +106,7 @@ suite("cloud/controller", () => {
       dispose(deps)
     })
 
-    test("shows link options when logged in but no app", async () => {
+    test("calls deploy when logged in but no app", async () => {
       const deps = createController()
       const workspaceRoot = vscode.Uri.file("/tmp/test")
       const workspaceFolder = { uri: workspaceRoot, name: "test", index: 0 }
@@ -131,6 +131,11 @@ suite("cloud/controller", () => {
         .stub(vscode.authentication, "getSession")
         .resolves(mockSession as any)
 
+      // Deploy needs config to return null and teams to be available
+      sinon.stub(deps.configService, "getConfig").resolves(null)
+      sinon.stub(deps.apiService, "getTeams").resolves([testTeam])
+
+      // When not configured, showMenu calls deploy which shows create/link options
       const quickPickStub = sinon
         .stub(vscode.window, "showQuickPick")
         .resolves(undefined)
@@ -361,7 +366,10 @@ suite("cloud/controller", () => {
 
       await deps.controller.initialize()
 
-      assert.strictEqual(deps.statusBar.text, "$(cloud) Set up FastAPI Cloud")
+      assert.strictEqual(
+        deps.statusBar.text,
+        "$(rocket) Deploy to FastAPI Cloud",
+      )
 
       dispose(deps)
     })
@@ -460,7 +468,10 @@ suite("cloud/controller", () => {
 
       await deps.controller.initialize()
 
-      assert.strictEqual(deps.statusBar.text, "$(cloud) Set up FastAPI Cloud")
+      assert.strictEqual(
+        deps.statusBar.text,
+        "$(rocket) Deploy to FastAPI Cloud",
+      )
       assert.ok(!warnStub.called)
 
       dispose(deps)
@@ -510,11 +521,11 @@ suite("cloud/controller", () => {
         .stub(vscode.authentication, "getSession")
         .resolves(mockSession as any)
       sinon.stub(deps.configService, "startWatching")
-      sinon
-        .stub(deps.configService, "getConfig")
-        .resolves({ app_id: "a1", team_id: "t1" })
+      const getConfigStub = sinon.stub(deps.configService, "getConfig")
+      getConfigStub.resolves({ app_id: "a1", team_id: "t1" })
       sinon.stub(deps.apiService, "getApp").resolves(testApp)
       sinon.stub(deps.apiService, "getTeam").resolves(testTeam)
+      sinon.stub(deps.apiService, "getTeams").resolves([testTeam])
 
       // Set up active editor to point to workspace
       const activeEditor = {
@@ -534,7 +545,10 @@ suite("cloud/controller", () => {
 
       deps.controller.removeWorkspaceFolder(workspace)
 
-      // Verify state was deleted by showing menu - should show setup menu (not_configured)
+      // After removing workspace, config is no longer cached, so getConfig returns null
+      getConfigStub.resolves(null)
+
+      // Verify state was deleted - showMenu calls deploy which shows create/link options
       const quickPickStub = sinon
         .stub(vscode.window, "showQuickPick")
         .resolves(undefined)
@@ -695,7 +709,10 @@ suite("cloud/controller", () => {
       await deps.controller.initialize()
 
       // Verify state is error by checking status bar shows setup (error state shows setup)
-      assert.strictEqual(deps.statusBar.text, "$(cloud) Set up FastAPI Cloud")
+      assert.strictEqual(
+        deps.statusBar.text,
+        "$(rocket) Deploy to FastAPI Cloud",
+      )
 
       dispose(deps)
     })
@@ -998,7 +1015,10 @@ suite("cloud/controller", () => {
         .returns(workspaceFolder2)
 
       await deps.controller.refreshAll()
-      assert.strictEqual(deps.statusBar.text, "$(cloud) Set up FastAPI Cloud")
+      assert.strictEqual(
+        deps.statusBar.text,
+        "$(rocket) Deploy to FastAPI Cloud",
+      )
 
       dispose(deps)
     })
@@ -1190,7 +1210,7 @@ suite("cloud/controller", () => {
       const firstCall = quickPickStub.firstCall.args[0] as any[]
       assert.ok(firstCall.some((item: any) => item.id === "open"))
 
-      // Switch to workspace2 - shows setup menu
+      // Switch to workspace2 - calls deploy directly (which handles setup)
       const editor2 = {
         document: { uri: vscode.Uri.file("/tmp/workspace2/file.py") },
       }
@@ -1201,12 +1221,6 @@ suite("cloud/controller", () => {
       getWorkspaceFolderStub
         .withArgs(editor2.document.uri)
         .returns(workspaceFolder2)
-
-      quickPickStub.resetHistory()
-      await deps.controller.showMenu()
-
-      const secondCall = quickPickStub.firstCall.args[0] as any[]
-      assert.ok(secondCall.some((item: any) => item.id === "link"))
 
       dispose(deps)
     })

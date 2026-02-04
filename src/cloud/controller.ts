@@ -47,8 +47,6 @@ export class CloudController {
       () => this.getActiveWorkspaceFolder(),
       {
         signOut: () => this.signOut(),
-        linkProject: (uri) => this.linkProject(uri),
-        createAndLinkProject: (uri) => this.createAndLinkProject(uri),
         unlinkProject: (uri) => this.unlinkProject(uri),
         deploy: (uri) => this.deploy(uri),
       },
@@ -277,7 +275,7 @@ export class CloudController {
   async deploy(workspaceRoot?: vscode.Uri): Promise<void> {
     const root = workspaceRoot ?? this.getActiveWorkspaceFolder()
 
-    await deploy({
+    const success = await deploy({
       workspaceRoot: root,
       configService: this.configService,
       apiService: this.apiService,
@@ -286,7 +284,9 @@ export class CloudController {
 
     if (root) {
       await this.refresh(root)
-      await this.statusBarManager.update()
+      if (!success) {
+        await this.statusBarManager.update()
+      }
     }
   }
 
