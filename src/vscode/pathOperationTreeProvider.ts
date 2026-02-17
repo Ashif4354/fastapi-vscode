@@ -15,7 +15,7 @@ import type {
   RouterDefinition,
 } from "../core/types"
 
-export type EndpointTreeItem =
+export type PathOperationTreeItem =
   | { type: "workspace"; label: string; apps: AppDefinition[] }
   | { type: "app"; app: AppDefinition }
   | { type: "router"; router: RouterDefinition }
@@ -92,7 +92,7 @@ export function getRouteLabel(route: RouteDefinition): string {
 function sortedChildren(
   routers: RouterDefinition[],
   routes: RouteDefinition[],
-): EndpointTreeItem[] {
+): PathOperationTreeItem[] {
   return [
     ...routers
       .map((router) => ({ type: "router" as const, router }))
@@ -115,22 +115,23 @@ function sortedChildren(
   ]
 }
 
-export class EndpointTreeProvider
-  implements TreeDataProvider<EndpointTreeItem>
+export class PathOperationTreeProvider
+  implements TreeDataProvider<PathOperationTreeItem>
 {
-  private _onDidChangeTreeData: EventEmitter<EndpointTreeItem | undefined> =
-    new EventEmitter()
+  private _onDidChangeTreeData: EventEmitter<
+    PathOperationTreeItem | undefined
+  > = new EventEmitter()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
 
   private apps: AppDefinition[] = []
-  private roots: EndpointTreeItem[] = []
+  private roots: PathOperationTreeItem[] = []
 
   // VS Code caches collapsible state by item id, so toggling routersExpanded
   // alone won't re-render. Bumping toggleCount changes the id, forcing a reset.
   private routersExpanded = false
   private toggleCount = 0
 
-  constructor(apps: AppDefinition[] = [], roots?: EndpointTreeItem[]) {
+  constructor(apps: AppDefinition[] = [], roots?: PathOperationTreeItem[]) {
     this.apps = apps
     this.roots = roots ?? apps.map((app) => ({ type: "app" as const, app }))
   }
@@ -139,7 +140,7 @@ export class EndpointTreeProvider
     return this.apps
   }
 
-  setApps(apps: AppDefinition[], roots?: EndpointTreeItem[]): void {
+  setApps(apps: AppDefinition[], roots?: PathOperationTreeItem[]): void {
     this.apps = apps
     this.roots = roots ?? apps.map((app) => ({ type: "app" as const, app }))
     this.refresh()
@@ -157,7 +158,7 @@ export class EndpointTreeProvider
     return findRouter(this.apps, (router) => router.routes.includes(target))
   }
 
-  getParent(element: EndpointTreeItem): EndpointTreeItem | undefined {
+  getParent(element: PathOperationTreeItem): PathOperationTreeItem | undefined {
     switch (element.type) {
       case "message":
       case "workspace":
@@ -190,7 +191,7 @@ export class EndpointTreeProvider
     }
   }
 
-  getChildren(element?: EndpointTreeItem): EndpointTreeItem[] {
+  getChildren(element?: PathOperationTreeItem): PathOperationTreeItem[] {
     if (!element) {
       if (this.apps.length === 0) {
         return [{ type: "message", text: "No FastAPI app found" }]
@@ -213,7 +214,7 @@ export class EndpointTreeProvider
     }
   }
 
-  getTreeItem(element: EndpointTreeItem): TreeItem {
+  getTreeItem(element: PathOperationTreeItem): TreeItem {
     switch (element.type) {
       case "message": {
         const item = new TreeItem(element.text)
@@ -271,7 +272,7 @@ export class EndpointTreeProvider
           `${element.route.method} ${element.route.path}\n\nFunction: ${element.route.functionName}\nFile: ${element.route.location.filePath}:${element.route.location.line}`,
         )
         routeItem.command = {
-          command: "fastapi-vscode.goToEndpoint",
+          command: "fastapi-vscode.goToPathOperation",
           title: "Go to Definition",
           arguments: [element],
         }
