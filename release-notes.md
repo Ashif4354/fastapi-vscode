@@ -4,6 +4,10 @@
 
 * 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+## Fixes
+
+* 🐛 Fix failed deployment UX. PR [#41](https://github.com/fastapi/fastapi-vscode/pull/41) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Internal
 
 * 🍱  Resize GIFs for README and Walkthrough. PR [#40](https://github.com/fastapi/fastapi-vscode/pull/40) by [@savannahostrowski](https://github.com/savannahostrowski).
