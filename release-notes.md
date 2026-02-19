@@ -4,6 +4,10 @@
 
 * 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+## Internal
+
+* ⚙️  Remove `dist/` before running tests to prevent stale files. PR [#61](https://github.com/fastapi/fastapi-vscode/pull/61) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Fixes
 
 * 🐛  Add `matchOnDescription` to allow function name searching. PR [#60](https://github.com/fastapi/fastapi-vscode/pull/60) by [@savannahostrowski](https://github.com/savannahostrowski).
