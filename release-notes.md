@@ -6,6 +6,10 @@
 
 ## Internal
 
+* ✅ Improve test coverage and add CI step to ensure coverage. PR [#28](https://github.com/fastapi/fastapi-vscode/pull/28) by [@savannahostrowski](https://github.com/savannahostrowski).
+
+## Internal
+
 * ♻️ Refactor tree utils and EndpointTreeProvider. PR [#29](https://github.com/fastapi/fastapi-vscode/pull/29) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## Internal
