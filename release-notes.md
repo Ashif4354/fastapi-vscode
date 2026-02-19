@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+* 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Internal
 
 * 👷 Add latest-changes GitHub action and labeler. PR [#11](https://github.com/fastapi/fastapi-vscode/pull/11) by [@tiangolo](https://github.com/tiangolo).
