@@ -5,6 +5,17 @@
   "version": "0.0.6",
   "publisher": "FastAPILabs",
   "license": "MIT",
+  "icon": "media/icons/icon.png",
+  "keywords": [
+    "fastapi",
+    "python",
+    "api",
+    "rest"
+  ],
+  "galleryBanner": {
+    "color": "#009485",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/fastapi/fastapi-vscode"
