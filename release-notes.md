@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+### Internal
+
+* 🔧 Fix latest-changes sub-header config and current release notes with it. PR [#72](https://github.com/fastapi/fastapi-vscode/pull/72) by [@tiangolo](https://github.com/tiangolo).
+
 ## Features
 
 * ✨ Display docstrings on hover in path operations panel. PR [#67](https://github.com/fastapi/fastapi-vscode/pull/67) by [@savannahostrowski](https://github.com/savannahostrowski).
