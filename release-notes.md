@@ -4,6 +4,10 @@
 
 ## Features
 
+* ✨ Add file watching for Endpoint Explorer. PR [#3](https://github.com/fastapi/fastapi-vscode/pull/3) by [@savannahostrowski](https://github.com/savannahostrowski).
+
+## Features
+
 * ✨ Add endpoint discovery service for Endpoint Explorer. PR [#2](https://github.com/fastapi/fastapi-vscode/pull/2) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## Features
