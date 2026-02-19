@@ -6,6 +6,10 @@
 
 ## Features
 
+* ✨ Add support for deployment to FastAPI Cloud. PR [#34](https://github.com/fastapi/fastapi-vscode/pull/34) by [@savannahostrowski](https://github.com/savannahostrowski).
+
+## Features
+
 * ✨ Cloud authentication, basic status bar and project linking/unlinking. PR [#32](https://github.com/fastapi/fastapi-vscode/pull/32) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## Fixes
