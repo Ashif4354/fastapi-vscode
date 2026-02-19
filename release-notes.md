@@ -6,6 +6,10 @@
 
 ## Fixes
 
+* 🚸 Update methods to use colours instead of icons. PR [#55](https://github.com/fastapi/fastapi-vscode/pull/55) by [@savannahostrowski](https://github.com/savannahostrowski).
+
+## Fixes
+
 * 🐛 Fix failed deployment UX. PR [#41](https://github.com/fastapi/fastapi-vscode/pull/41) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## Internal
