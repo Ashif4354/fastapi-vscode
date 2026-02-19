@@ -4,6 +4,10 @@
 
 * 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+## Fixes
+
+* 🐛  Find all FastAPI apps in a workspace folder, rather than just the shallowest. PR [#69](https://github.com/fastapi/fastapi-vscode/pull/69) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Internal
 
 * ⚙️   Allow per-project telemetry configuration. PR [#68](https://github.com/fastapi/fastapi-vscode/pull/68) by [@savannahostrowski](https://github.com/savannahostrowski).
