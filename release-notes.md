@@ -6,6 +6,10 @@
 
 ## Internal
 
+* 🔧 Update .vscodeignore to ignore coverage/ and scripts/. PR [#30](https://github.com/fastapi/fastapi-vscode/pull/30) by [@savannahostrowski](https://github.com/savannahostrowski).
+
+## Internal
+
 * ✅ Improve test coverage and add CI step to ensure coverage. PR [#28](https://github.com/fastapi/fastapi-vscode/pull/28) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## Internal
