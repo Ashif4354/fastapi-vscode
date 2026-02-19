@@ -4,6 +4,10 @@
 
 * 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+## Refactors
+
+* ♻️ Refactor `fastapi.entryPoint` accept module notation only. PR [#65](https://github.com/fastapi/fastapi-vscode/pull/65) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Fixes
 
 * 🚸 Add toast to show that authentication succeeded. PR [#64](https://github.com/fastapi/fastapi-vscode/pull/64) by [@savannahostrowski](https://github.com/savannahostrowski).
