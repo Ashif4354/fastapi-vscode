@@ -4,6 +4,10 @@
 
 ## Features
 
+* ✨ Add Test CodeLens navigation. PR [#8](https://github.com/fastapi/fastapi-vscode/pull/8) by [@savannahostrowski](https://github.com/savannahostrowski).
+
+## Features
+
 * ✨ Add Report Issue command in Command Palette. PR [#5](https://github.com/fastapi/fastapi-vscode/pull/5) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## Features
