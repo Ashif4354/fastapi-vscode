@@ -4,6 +4,10 @@
 
 * 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+## Internal
+
+* 🍱  Resize GIFs for README and Walkthrough. PR [#40](https://github.com/fastapi/fastapi-vscode/pull/40) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Features
 
 * ✨ Add support for FastAPI Cloud log streaming. PR [#39](https://github.com/fastapi/fastapi-vscode/pull/39) by [@savannahostrowski](https://github.com/savannahostrowski).
