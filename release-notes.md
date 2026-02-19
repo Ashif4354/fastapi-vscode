@@ -6,6 +6,10 @@
 
 ## Internal
 
+* ♻️ Refactor tree utils and EndpointTreeProvider. PR [#29](https://github.com/fastapi/fastapi-vscode/pull/29) by [@savannahostrowski](https://github.com/savannahostrowski).
+
+## Internal
+
 * 📈 Add telemetry infrastructure, events and documentation. PR [#22](https://github.com/fastapi/fastapi-vscode/pull/22) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## Fixes
