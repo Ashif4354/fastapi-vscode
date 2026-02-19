@@ -4,6 +4,10 @@
 
 * 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+## Internal
+
+* 📈 Add telemetry infrastructure, events and documentation. PR [#22](https://github.com/fastapi/fastapi-vscode/pull/22) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Fixes
 
 * 🐛 Fix activity bar logo. PR [#27](https://github.com/fastapi/fastapi-vscode/pull/27) by [@savannahostrowski](https://github.com/savannahostrowski).
