@@ -4,6 +4,10 @@
 
 * 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+## Fixes
+
+* 🐛 Fix posthog import crashing in vscode.dev. PR [#31](https://github.com/fastapi/fastapi-vscode/pull/31) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Internal
 
 * 🔧 Update .vscodeignore to ignore coverage/ and scripts/. PR [#30](https://github.com/fastapi/fastapi-vscode/pull/30) by [@savannahostrowski](https://github.com/savannahostrowski).
