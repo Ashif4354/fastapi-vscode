@@ -4,6 +4,10 @@
 
 * 🔧  Update `.vscodeignore` to make bundle smaller. PR [#6](https://github.com/fastapi/fastapi-vscode/pull/6) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+## Fixes
+
+* 🚸 Watch all settings changes so we prompt to reload when changed. PR [#57](https://github.com/fastapi/fastapi-vscode/pull/57) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Internal
 
 * ♻️ Rename endpoint to path operation. PR [#56](https://github.com/fastapi/fastapi-vscode/pull/56) by [@savannahostrowski](https://github.com/savannahostrowski).
