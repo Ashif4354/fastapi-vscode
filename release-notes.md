@@ -6,6 +6,10 @@
 
 ## Features
 
+* ✨ Add support for vscode.dev. PR [#18](https://github.com/fastapi/fastapi-vscode/pull/18) by [@savannahostrowski](https://github.com/savannahostrowski).
+
+## Features
+
 * ✨ Support multiroot workspaces. PR [#23](https://github.com/fastapi/fastapi-vscode/pull/23) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## Features
