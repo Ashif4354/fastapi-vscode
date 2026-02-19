@@ -2,6 +2,10 @@
 
 ## Latest Changes
 
+## Internal
+
+* ♻️  Rename `object` to `owner` in `RouteInfo`, `IncludeRouterInfo` and `MountInfo` . PR [#10](https://github.com/fastapi/fastapi-vscode/pull/10) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ## Fixes
 
 * 🐛  Fix incorrect selection of root when app and router defined in same file. PR [#9](https://github.com/fastapi/fastapi-vscode/pull/9) by [@savannahostrowski](https://github.com/savannahostrowski).
