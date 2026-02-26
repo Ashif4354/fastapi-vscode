@@ -42,8 +42,13 @@
 * 🐛 Fix CodeLens route matching and nested router discovery . PR [#20](https://github.com/fastapi/fastapi-vscode/pull/20) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 🐛  Fix incorrect selection of root when app and router defined in same file. PR [#9](https://github.com/fastapi/fastapi-vscode/pull/9) by [@savannahostrowski](https://github.com/savannahostrowski).
 
+### Refactors
+
+* ♻️ Refactor `fastapi.entryPoint` accept module notation only. PR [#65](https://github.com/fastapi/fastapi-vscode/pull/65) by [@savannahostrowski](https://github.com/savannahostrowski).
+
 ### Docs
 
+* 📝 Update release notes. PR [#81](https://github.com/fastapi/fastapi-vscode/pull/81) by [@tiangolo](https://github.com/tiangolo).
 * 📝  Update details about application discovery in README. PR [#80](https://github.com/fastapi/fastapi-vscode/pull/80) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 📝 Update `entryPoint` setting description in README to specify module notation. PR [#74](https://github.com/fastapi/fastapi-vscode/pull/74) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 📝 Update GIFs and simplify walkthrough. PR [#73](https://github.com/fastapi/fastapi-vscode/pull/73) by [@savannahostrowski](https://github.com/savannahostrowski).
@@ -52,10 +57,6 @@
 * 📝  Cleanup README to highlight features and usage. PR [#26](https://github.com/fastapi/fastapi-vscode/pull/26) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 📝 Update feature list in docs. PR [#24](https://github.com/fastapi/fastapi-vscode/pull/24) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 📝 Add documentation for `fastapi.showTestCodeLenses`. PR [#16](https://github.com/fastapi/fastapi-vscode/pull/16) by [@savannahostrowski](https://github.com/savannahostrowski).
-
-### Refactors
-
-* ♻️ Refactor `fastapi.entryPoint` accept module notation only. PR [#65](https://github.com/fastapi/fastapi-vscode/pull/65) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ### Internal
 
