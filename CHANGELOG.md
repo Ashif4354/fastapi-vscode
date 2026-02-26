@@ -8,6 +8,7 @@
 
 ### Docs
 
+* 📝  Update details about application discovery in README. PR [#80](https://github.com/fastapi/fastapi-vscode/pull/80) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 📝 Update `entryPoint` setting description in README to specify module notation. PR [#74](https://github.com/fastapi/fastapi-vscode/pull/74) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 📝 Update GIFs and simplify walkthrough. PR [#73](https://github.com/fastapi/fastapi-vscode/pull/73) by [@savannahostrowski](https://github.com/savannahostrowski).
 
