@@ -48,6 +48,7 @@
 
 ### Docs
 
+* 📝  Fix URL for published extension. PR [#82](https://github.com/fastapi/fastapi-vscode/pull/82) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 📝 Update release notes. PR [#81](https://github.com/fastapi/fastapi-vscode/pull/81) by [@tiangolo](https://github.com/tiangolo).
 * 📝  Update details about application discovery in README. PR [#80](https://github.com/fastapi/fastapi-vscode/pull/80) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 📝 Update `entryPoint` setting description in README to specify module notation. PR [#74](https://github.com/fastapi/fastapi-vscode/pull/74) by [@savannahostrowski](https://github.com/savannahostrowski).
