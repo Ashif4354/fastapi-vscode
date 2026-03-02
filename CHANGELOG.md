@@ -4,6 +4,7 @@
 
 ### Fixes
 
+* 🐛  Add support to extractors for keyword args in definitions. PR [#95](https://github.com/fastapi/fastapi-vscode/pull/95) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 🐛  Improve monorepo application discovery. PR [#90](https://github.com/fastapi/fastapi-vscode/pull/90) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ### Internal
