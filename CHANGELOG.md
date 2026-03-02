@@ -2,6 +2,8 @@
 
 ## Latest Changes
 
+## 0.1.2
+
 ### Internal
 
 * ⏪ Revert "⚙️  Remove 'Extension' from display name". PR [#97](https://github.com/fastapi/fastapi-vscode/pull/97) by [@savannahostrowski](https://github.com/savannahostrowski).
