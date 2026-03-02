@@ -223,6 +223,23 @@ def handle_items():
       assert.strictEqual(result.method, "GET")
     })
 
+    test("extracts route with 'path' keyword argument", () => {
+      const code = `
+@app.get(path="/users/{user_id}", include_in_schema=False)
+def get_user(user_id: int):
+    pass
+`
+      const tree = parse(code)
+      const decoratedDefs = findNodesByType(
+        tree.rootNode,
+        "decorated_definition",
+      )
+      const result = decoratorExtractor(decoratedDefs[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.path, "/users/{user_id}")
+    })
+
     test("returns null for non-decorated definition", () => {
       const code = `
 def regular_function():
@@ -574,6 +591,17 @@ def list_users():
 
       assert.ok(result)
       assert.deepStrictEqual(result.tags, ["users", "admin"])
+    })
+
+    test("extracts include_router with 'router' keyword argument", () => {
+      const code = `app.include_router(router=users_router, prefix="/api")`
+      const tree = parse(code)
+      const calls = findNodesByType(tree.rootNode, "call")
+      const result = includeRouterExtractor(calls[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.router, "users_router")
+      assert.strictEqual(result.prefix, "/api")
     })
 
     test("returns null for non-include_router call", () => {
