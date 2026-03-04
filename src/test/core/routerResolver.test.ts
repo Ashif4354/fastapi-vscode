@@ -570,5 +570,80 @@ suite("routerResolver", () => {
 
       assert.strictEqual(result, null)
     })
+
+    test("resolves custom APIRouter subclass as child router", async () => {
+      const result = await buildRouterGraph(
+        fixtures.customSubclass.mainPy,
+        parser,
+        fixtures.customSubclass.root,
+        nodeFileSystem,
+      )
+
+      assert.ok(result)
+      assert.strictEqual(result.type, "FastAPI")
+      assert.strictEqual(result.variableName, "app")
+
+      assert.strictEqual(
+        result.children.length,
+        1,
+        "Should have one child router",
+      )
+
+      const adminRouter = result.children[0].router
+      assert.strictEqual(adminRouter.type, "APIRouter")
+      assert.strictEqual(adminRouter.prefix, "/admin")
+      assert.strictEqual(adminRouter.routes.length, 2)
+
+      const paths = adminRouter.routes.map((r) => r.path)
+      assert.ok(paths.includes("/users"))
+
+      const methods = adminRouter.routes.map((r) => r.method.toLowerCase())
+      assert.ok(methods.includes("get"))
+      assert.ok(methods.includes("post"))
+    })
+
+    test("resolves aliased FastAPI and APIRouter class imports", async () => {
+      const result = await buildRouterGraph(
+        fixtures.aliasedClass.mainPy,
+        parser,
+        fixtures.aliasedClass.root,
+        nodeFileSystem,
+      )
+
+      assert.ok(result)
+      assert.strictEqual(result.type, "FastAPI")
+      assert.strictEqual(result.variableName, "app")
+
+      assert.strictEqual(
+        result.children.length,
+        1,
+        "Should have one child router",
+      )
+
+      const usersRouter = result.children[0].router
+      assert.strictEqual(usersRouter.type, "APIRouter")
+      assert.strictEqual(usersRouter.prefix, "/users")
+      assert.strictEqual(usersRouter.routes.length, 2)
+    })
+
+    test("resolves module-aliased fastapi import (import fastapi as f)", async () => {
+      const result = await buildRouterGraph(
+        fixtures.aliasedModule.mainPy,
+        parser,
+        fixtures.aliasedModule.root,
+        nodeFileSystem,
+      )
+
+      assert.ok(result)
+      assert.strictEqual(result.type, "FastAPI")
+      assert.strictEqual(result.variableName, "app")
+
+      assert.strictEqual(result.children.length, 1)
+
+      const usersRouter = result.children[0].router
+      assert.strictEqual(usersRouter.type, "APIRouter")
+      assert.strictEqual(usersRouter.prefix, "/users")
+      assert.strictEqual(usersRouter.routes.length, 2)
+    })
   })
 })

@@ -14,7 +14,11 @@ import {
   Uri,
 } from "vscode"
 import type { Node } from "web-tree-sitter"
-import { extractPathFromNode, findNodesByType } from "../core/extractors"
+import {
+  extractPathFromNode,
+  findNodesByType,
+  resolveArgNode,
+} from "../core/extractors"
 import { ROUTE_METHODS } from "../core/internal"
 import type { Parser } from "../core/parser"
 import {
@@ -134,8 +138,11 @@ export class TestCodeLensProvider implements CodeLensProvider {
         continue
       }
 
-      const pathArg = args[0]
-      // extractPathFromNode always returns a non-empty string for valid AST nodes
+      const pathArg = resolveArgNode(args, 0, "url")
+
+      if (!pathArg) {
+        continue
+      }
       const path = extractPathFromNode(pathArg)
 
       calls.push({

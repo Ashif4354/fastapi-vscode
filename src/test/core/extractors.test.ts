@@ -1,5 +1,7 @@
 import * as assert from "node:assert"
 import {
+  collectRecognizedNames,
+  collectStringVariables,
   decoratorExtractor,
   extractPathFromNode,
   extractStringValue,
@@ -465,6 +467,171 @@ def list_users():
       assert.strictEqual(result.type, "APIRouter")
       assert.strictEqual(result.prefix, "/api")
     })
+
+    test("returns null for custom subclass without subclasses set", () => {
+      const code = "admin_router = AdminAPIRouter(prefix='/admin')"
+      const tree = parse(code)
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const result = routerExtractor(assignments[0])
+
+      assert.strictEqual(result, null)
+    })
+
+    test("recognizes custom APIRouter subclass", () => {
+      const code = `
+class AdminAPIRouter(APIRouter):
+    pass
+
+admin_router = AdminAPIRouter(prefix="/admin")
+`
+      const tree = parse(code)
+      const { apiRouterNames } = collectRecognizedNames(tree.rootNode)
+      assert.ok(apiRouterNames.has("AdminAPIRouter"))
+
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const result = routerExtractor(assignments[0], apiRouterNames)
+
+      assert.ok(result)
+      assert.strictEqual(result.variableName, "admin_router")
+      assert.strictEqual(result.type, "APIRouter")
+      assert.strictEqual(result.prefix, "/admin")
+    })
+
+    test("recognizes FastAPI subclass", () => {
+      const code = `
+class MyApp(FastAPI):
+    pass
+
+app = MyApp()
+`
+      const tree = parse(code)
+      const { fastAPINames, apiRouterNames } = collectRecognizedNames(
+        tree.rootNode,
+      )
+      assert.ok(fastAPINames.has("MyApp"))
+      assert.ok(!apiRouterNames.has("MyApp"))
+
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const result = routerExtractor(
+        assignments[0],
+        apiRouterNames,
+        fastAPINames,
+      )
+
+      assert.ok(result)
+      assert.strictEqual(result.variableName, "app")
+      assert.strictEqual(result.type, "FastAPI")
+    })
+
+    test("recognizes aliased FastAPI import (FastAPI as FA)", () => {
+      const code = `
+from fastapi import FastAPI as FA
+
+app = FA()
+`
+      const tree = parse(code)
+      const { fastAPINames, apiRouterNames } = collectRecognizedNames(
+        tree.rootNode,
+      )
+      assert.ok(fastAPINames.has("FA"))
+
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const result = routerExtractor(
+        assignments[0],
+        apiRouterNames,
+        fastAPINames,
+      )
+
+      assert.ok(result)
+      assert.strictEqual(result.variableName, "app")
+      assert.strictEqual(result.type, "FastAPI")
+    })
+
+    test("recognizes aliased APIRouter import (APIRouter as AR)", () => {
+      const code = `
+from fastapi import APIRouter as AR
+
+router = AR(prefix="/items")
+`
+      const tree = parse(code)
+      const { apiRouterNames } = collectRecognizedNames(tree.rootNode)
+      assert.ok(apiRouterNames.has("AR"))
+
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const result = routerExtractor(assignments[0], apiRouterNames)
+
+      assert.ok(result)
+      assert.strictEqual(result.variableName, "router")
+      assert.strictEqual(result.type, "APIRouter")
+      assert.strictEqual(result.prefix, "/items")
+    })
+
+    test("recognizes subclass of aliased APIRouter (class MyRouter(AR))", () => {
+      const code = `
+from fastapi import APIRouter as AR
+
+class MyRouter(AR):
+    pass
+
+router = MyRouter(prefix="/items")
+`
+      const tree = parse(code)
+      const { apiRouterNames } = collectRecognizedNames(tree.rootNode)
+      assert.ok(apiRouterNames.has("AR"))
+      assert.ok(apiRouterNames.has("MyRouter"))
+
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const result = routerExtractor(assignments[0], apiRouterNames)
+
+      assert.ok(result)
+      assert.strictEqual(result.type, "APIRouter")
+    })
+
+    test("collectRecognizedNames ignores non-aliased imports", () => {
+      const code = "from fastapi import FastAPI, APIRouter"
+      const tree = parse(code)
+      const { fastAPINames, apiRouterNames } = collectRecognizedNames(
+        tree.rootNode,
+      )
+      // Only the defaults — no extras from non-aliased imports
+      assert.strictEqual(fastAPINames.size, 2) // "FastAPI", "fastapi.FastAPI"
+      assert.strictEqual(apiRouterNames.size, 2) // "APIRouter", "fastapi.APIRouter"
+    })
+
+    test("recognizes module alias (import fastapi as f)", () => {
+      const code = `
+import fastapi as f
+
+app = f.FastAPI()
+router = f.APIRouter(prefix="/items")
+`
+      const tree = parse(code)
+      const { fastAPINames, apiRouterNames } = collectRecognizedNames(
+        tree.rootNode,
+      )
+      assert.ok(fastAPINames.has("f.FastAPI"))
+      assert.ok(apiRouterNames.has("f.APIRouter"))
+
+      const assignments = findNodesByType(tree.rootNode, "assignment")
+      const appResult = routerExtractor(
+        assignments[0],
+        apiRouterNames,
+        fastAPINames,
+      )
+      assert.ok(appResult)
+      assert.strictEqual(appResult.variableName, "app")
+      assert.strictEqual(appResult.type, "FastAPI")
+
+      const routerResult = routerExtractor(
+        assignments[1],
+        apiRouterNames,
+        fastAPINames,
+      )
+      assert.ok(routerResult)
+      assert.strictEqual(routerResult.variableName, "router")
+      assert.strictEqual(routerResult.type, "APIRouter")
+      assert.strictEqual(routerResult.prefix, "/items")
+    })
   })
 
   suite("importExtractor", () => {
@@ -477,6 +644,38 @@ def list_users():
       assert.ok(result)
       assert.strictEqual(result.modulePath, "fastapi")
       assert.deepStrictEqual(result.names, ["fastapi"])
+      assert.deepStrictEqual(result.namedImports, [
+        { name: "fastapi", alias: null },
+      ])
+      assert.strictEqual(result.isRelative, false)
+    })
+
+    test("preserves full dotted modulePath for import fastapi.routing", () => {
+      const code = "import fastapi.routing"
+      const tree = parse(code)
+      const imports = findNodesByType(tree.rootNode, "import_statement")
+      const result = importExtractor(imports[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.modulePath, "fastapi.routing")
+      assert.deepStrictEqual(result.names, ["fastapi"])
+      assert.deepStrictEqual(result.namedImports, [
+        { name: "fastapi", alias: null },
+      ])
+    })
+
+    test("extracts aliased module import (import fastapi as f)", () => {
+      const code = "import fastapi as f"
+      const tree = parse(code)
+      const imports = findNodesByType(tree.rootNode, "import_statement")
+      const result = importExtractor(imports[0])
+
+      assert.ok(result)
+      assert.strictEqual(result.modulePath, "fastapi")
+      assert.deepStrictEqual(result.names, ["f"])
+      assert.deepStrictEqual(result.namedImports, [
+        { name: "fastapi", alias: "f" },
+      ])
       assert.strictEqual(result.isRelative, false)
     })
 
@@ -662,6 +861,53 @@ def list_users():
       const result = mountExtractor(calls[0])
 
       assert.strictEqual(result, null)
+    })
+  })
+
+  suite("collectStringVariables", () => {
+    test("collects module-level string assignments", () => {
+      const code = `
+PREFIX = "/api"
+VERSION = "/v1"
+`
+      const tree = parse(code)
+      const vars = collectStringVariables(tree.rootNode)
+      assert.strictEqual(vars.get("PREFIX"), "/api")
+      assert.strictEqual(vars.get("VERSION"), "/v1")
+    })
+
+    test("ignores function-local variables", () => {
+      const code = `
+PREFIX = "/api"
+
+def handler():
+    PREFIX = "/local"
+`
+      const tree = parse(code)
+      const vars = collectStringVariables(tree.rootNode)
+      assert.strictEqual(vars.get("PREFIX"), "/api")
+    })
+
+    test("ignores class-level variables", () => {
+      const code = `
+PREFIX = "/api"
+
+class Config:
+    PREFIX = "/class-level"
+`
+      const tree = parse(code)
+      const vars = collectStringVariables(tree.rootNode)
+      assert.strictEqual(vars.get("PREFIX"), "/api")
+    })
+
+    test("ignores non-string assignments", () => {
+      const code = `
+COUNT = 42
+FLAG = True
+`
+      const tree = parse(code)
+      const vars = collectStringVariables(tree.rootNode)
+      assert.strictEqual(vars.size, 0)
     })
   })
 

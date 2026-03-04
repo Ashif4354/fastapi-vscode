@@ -87,6 +87,18 @@ export const fixtures = {
     root: uri(join(fixturesPath, "factory-func")),
     mainPy: uri(join(fixturesPath, "factory-func", "main.py")),
   },
+  customSubclass: {
+    root: uri(join(fixturesPath, "custom-subclass")),
+    mainPy: uri(join(fixturesPath, "custom-subclass", "main.py")),
+  },
+  aliasedClass: {
+    root: uri(join(fixturesPath, "aliased-class")),
+    mainPy: uri(join(fixturesPath, "aliased-class", "main.py")),
+  },
+  aliasedModule: {
+    root: uri(join(fixturesPath, "aliased-module")),
+    mainPy: uri(join(fixturesPath, "aliased-module", "main.py")),
+  },
 }
 
 /**
