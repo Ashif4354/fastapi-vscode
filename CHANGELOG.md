@@ -8,6 +8,7 @@
 
 ### Internal
 
+* ♻️ Use RouteInfo with Omit instead of anonymous type. PR [#110](https://github.com/fastapi/fastapi-vscode/pull/110) by [@savannahostrowski](https://github.com/savannahostrowski).
 * 🔖 Release version 0.1.3. PR [#108](https://github.com/fastapi/fastapi-vscode/pull/108) by [@savannahostrowski](https://github.com/savannahostrowski).
 
 ## 0.1.3
