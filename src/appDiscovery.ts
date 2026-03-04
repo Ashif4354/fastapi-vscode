@@ -62,7 +62,13 @@ async function findAllFastAPIFiles(
       fileName === "conftest.py"
     )
       continue
-    const content = await vscode.workspace.fs.readFile(uri)
+    let content: Uint8Array
+    try {
+      content = await vscode.workspace.fs.readFile(uri)
+    } catch {
+      log(`Skipping unreadable file: ${uri.toString()}`)
+      continue
+    }
     if (new TextDecoder().decode(content).includes("FastAPI(")) {
       results.push(uri.toString())
     }
