@@ -459,7 +459,9 @@ export function collectRecognizedNames(nodesByType: Map<string, Node[]>): {
       if (named.name === "fastapi") {
         fastAPINames.add(`${named.alias}.FastAPI`)
         apiRouterNames.add(`${named.alias}.APIRouter`)
-      }
+      } else if (named.name === "fastapi.FastAPI") fastAPINames.add(named.alias)
+      else if (named.name === "fastapi.APIRouter")
+        apiRouterNames.add(named.alias)
     }
   }
 
